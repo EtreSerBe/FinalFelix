@@ -3,29 +3,36 @@ using System.Collections;
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using System.Threading;
 
 public class Server : MonoBehaviour
 {
 
     static Server singleton;
 
-    private Socket m_Socket;
+	private Socket m_Socket;
+	private Socket m_SocketTick;
 
-    ArrayList m_Connections = new ArrayList();
+	ArrayList m_Connections = new ArrayList();
 
     ArrayList m_Buffer = new ArrayList();
     ArrayList m_ByteBuffer = new ArrayList();
 
     void Awake()
     {
+		Debug.Log("Error");
         m_Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        IPEndPoint ipLocal = new IPEndPoint(IPAddress.Any, Client.kPort);
+		m_SocketTick = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
 
-        m_Socket.Bind(ipLocal);
+		//IPEndPoint ipLocal = new IPEndPoint(IPAddress.Any, Client.kPort);
 
-        //start listening...
-        m_Socket.Listen(100);
-        singleton = this;
+        //m_Socket.Bind(ipLocal);
+
+		//start listening...
+		m_Socket.Listen( 10000 );
+		m_SocketTick.Listen( 11000 );
+
+		singleton = this;
     }
 
     void OnApplicationQuit()

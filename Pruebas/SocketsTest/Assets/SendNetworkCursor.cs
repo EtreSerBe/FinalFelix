@@ -9,7 +9,8 @@ public class SendNetworkCursor : MonoBehaviour {
 	}
 	
 	// Update is called once per frame
-	void Update () {
+	void Update ()
+	{
         // Create the message it and send it off!
         MessageData msgData = new MessageData();
         msgData.mousex = Input.mousePosition.x / Screen.width;
@@ -17,5 +18,6 @@ public class SendNetworkCursor : MonoBehaviour {
         msgData.stringData = "Hello World";
 
         Client.Send(msgData);
+
 	}
 }
