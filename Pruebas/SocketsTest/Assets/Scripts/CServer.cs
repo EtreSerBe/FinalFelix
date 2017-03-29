@@ -15,6 +15,8 @@ public class CServer : MonoBehaviour
 	Socket  m_Socket,
 			m_SocketTick;
 
+    UdpClient m_udpServer;
+
 	ArrayList m_lstClients = new ArrayList();
 
 	public static CServer CachedServer
@@ -29,6 +31,7 @@ public class CServer : MonoBehaviour
 
 		m_Socket = new Socket( AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
 		//m_SocketTick = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
+
 
 		IPEndPoint ipLocal = new IPEndPoint(IPAddress.Any, 10000);
 		m_Socket.ExclusiveAddressUse = false;
