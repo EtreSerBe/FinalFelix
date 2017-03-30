@@ -20,6 +20,7 @@ public struct Message
     public Message(byte[] in_receivedBytes)
     {
         string tmpString = Encoding.UTF8.GetString(in_receivedBytes);
+        Debug.Log("Constructing a Message with: " + tmpString);
         string[] tmpValuesArray = tmpString.Split('\t'); //Gives us 5 parts so we can use each one as one of the variables of this object.
         if ( tmpValuesArray.Length != 5 )
         {
@@ -56,7 +57,7 @@ public struct Message
     public override string ToString()
     {
         string tmpString;
-        tmpString = m_cIsForServer + '\t' + m_szSenderID + '\t' + m_szTargetAddress + '\t' + m_szMessageType + '\t' + m_szMessageContent;
+        tmpString = m_cIsForServer.ToString() + '\t' + m_szSenderID + '\t' + m_szTargetAddress + '\t' + m_szMessageType + '\t' + m_szMessageContent;
         return tmpString;
     }
 
@@ -92,7 +93,7 @@ public class CServer : MonoBehaviour
     //Used to store information about the connected clients to this server.
     //List<ClientInfo> m_lstClientInfo = new List<ClientInfo>();
     HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
-    public ArrayList m_MessagesList = new ArrayList();
+    public List<Message> m_MessagesList = new List<Message>();
 
     private int m_iCurrentID = 0;
 
@@ -154,27 +155,7 @@ public class CServer : MonoBehaviour
         Debug.Log("Exit of StartServer function.");
     }
 
-    private void ServerReceiveCallback(IAsyncResult result)
-    {
-        //Here, we will receive anything from the broadcast?
-        Debug.Log("Entered ServerReceiveCallback function, Callback for the BeginReceive function of the server.");
-        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
-        byte[] received = m_udpServer.EndReceive(result, ref RemoteIpEndPoint);
-        //Process codes
-        Debug.Log("The Server received data which was: " + Encoding.UTF8.GetString(received));
 
-        //Decode the "time" or something like that so it helps filter old messages.
-        //this is to be able to sort the messageList according to how old they are.
-
-        //********NOTE : ¿How does this method represent different messages received? do we have to separate them manually?****//
-
-        //Now, store it on the message list buffer.
-        m_MessagesList.Add(received);
-        Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
-
-        //We need to begin receiving again, otherwise, it'd only receive once.
-        m_udpServer.BeginReceive(new AsyncCallback(ServerReceiveCallback), null);
-    }
 
     void Update()
     {
@@ -186,13 +167,11 @@ public class CServer : MonoBehaviour
         
         while (m_MessagesList.Count != 0)
         {
-            byte[] tmpMessage =  (byte[])m_MessagesList[0]; //Get the first element opf the container.
+            Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
-            Message pActualMessage = new Message(tmpMessage);
 
             Debug.Log("Processing message with contents: " + pActualMessage.ToString());
-
-
+            
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
             {
@@ -210,7 +189,7 @@ public class CServer : MonoBehaviour
                         if (IsNewIPAddress(tmpInfo))
                         {
                             //This means it is new to this server. Check if it was already registered to another one. Do it by checking its ID.
-                            if (tmpInfo.m_iID == -1)
+                            if (tmpInfo.m_iID == 0)
                             {
                                 //It means it is a completely new client, not registered before. So have to assign a new ID to it.
                                 tmpInfo.m_iID = GetNewID();
