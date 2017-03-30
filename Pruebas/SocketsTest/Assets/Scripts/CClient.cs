@@ -16,10 +16,10 @@ public class CClient : MonoBehaviour
 
     bool bDisconnected = false;//This value must be modified when a first response of the server/host is received.
     public int m_iID = -1; //ID value used to identify the clients from the Server's perspective.
-    public String m_szClientIP = "0.0.0.0";
+    public string m_szClientIP = "0.0.0.0";
     public int m_iServerID = -2;
 
-    public String m_szServerIP = "0.0.0.0";
+    public string m_szServerIP = "0.0.0.0";
 
     ArrayList m_MessagesList = new ArrayList();
     HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
@@ -38,6 +38,19 @@ public class CClient : MonoBehaviour
 
         try
         {
+            Message msg = new Message();
+            msg.m_szSenderID = m_iID.ToString();
+            msg.m_cIsForServer = 'Y'; //yes, it is for server.
+            msg.m_szTargetAddress = m_szClientIP;
+            msg.m_szMessageType = "Begin_Con"; // which is, Begin Connection.
+            msg.m_szMessageContent = "empty"; // not necessary to pass a parameter here, so empty should be fine.
+
+            byte[] msgBytes = Encoding.UTF8.GetBytes( msg.ToString());
+
+            //Send a message to the server.
+            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
+            m_udpClient.Send( msgBytes, msgBytes.Length, RemoteIpEndPoint);//Do the broadcast.
+
             m_fTimeSinceLastResponse = 0.0f;
             Debug.Log("Beggining to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
@@ -80,6 +93,12 @@ public class CClient : MonoBehaviour
 
         //We need to begin receiving again, otherwise, it'd only receive once.
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
+    }
+
+    //I still have my doubts about this one, maybe it should have other parameters as well.
+    public void SendMessage(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent)
+    {
+        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szMessageContent);
     }
 
     // Update is called once per frame

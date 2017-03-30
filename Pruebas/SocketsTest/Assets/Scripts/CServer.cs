@@ -12,10 +12,10 @@ using System;
 public struct Message
 {
     public char m_cIsForServer;                    //Tipo de usuario (cliente o server)
-    public String m_szSenderID;                    //ID de quien lo envía
-    public String m_szTargetAddress;               //IP de a quién va dirigido ?
-    public String m_szMessageType;                 //tipo de mensaje (iniciar conexión, dejar conexión, update, etc.)
-    public String m_szMessageContent;              //Contenido del mensaje
+    public string m_szSenderID;                    //ID de quien lo envía
+    public string m_szTargetAddress;               //IP de a quién va dirigido ?
+    public string m_szMessageType;                 //tipo de mensaje (iniciar conexión, dejar conexión, update, etc.)
+    public string m_szMessageContent;              //Contenido del mensaje
 
     public Message(byte[] in_receivedBytes)
     {
@@ -41,6 +41,15 @@ public struct Message
         m_szMessageContent = tmpValuesArray[4];
 
         Debug.Log("A message was created, and it has the values: " + ToString());//Debug to see what does it say.
+    }
+
+    public Message(char in_isForServer, string in_szSenderID, string in_szTargetIPAddress, string in_szTypeOfMessage, string in_szMessageContent)
+    {
+        m_cIsForServer = in_isForServer; //By convention, this is where we will store this information.
+        m_szSenderID = in_szSenderID;
+        m_szTargetAddress = in_szTargetIPAddress;
+        m_szMessageType = in_szTypeOfMessage;
+        m_szMessageContent = in_szMessageContent;
     }
 
     //Overrided method to obtain a string with exactly the format desired to make the functioning better and easier.
