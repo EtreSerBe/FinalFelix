@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
@@ -21,6 +22,9 @@ public class CClient : MonoBehaviour
     public String m_szServerIP = "0.0.0.0";
 
     ArrayList m_MessagesList = new ArrayList();
+    HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
+
+    CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
 
     //CServer m_ServerReference:
@@ -29,8 +33,7 @@ public class CClient : MonoBehaviour
     void Start()
     {
         //Client uses as receive udp client
-        m_udpClient = new UdpClient(10000);
-        //AddressFamily.InterNetwork
+        m_udpClient = new UdpClient( 10000 );
         m_szClientIP = m_udpClient.Client.LocalEndPoint.ToString();
 
         try
@@ -44,9 +47,6 @@ public class CClient : MonoBehaviour
         {
             Debug.Log("caught exception : " + e.ToString());
         }
-
-
-
     }
 
     //CallBack, it's automatically called when the socket receives anything.
@@ -62,10 +62,21 @@ public class CClient : MonoBehaviour
         //Decode the "time" or something like that so it helps filter old messages.
         //this is to be able to sort the messageList according to how old they are.
 
-
-        //Now, store it on the message list buffer.
-        m_MessagesList.Add(  received);
-        Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
+        //First, check if it is for the client or for the server (if this machine happens to be the server too).
+        //PENDING****************
+        if (m_pServer != null && received[0] == 's')
+        {
+            //Then, it means it is destined for the server part, not the client. And the server ir running on this machine.
+            m_pServer.m_MessagesList.Add(received);
+            Debug.Log("The message just got passed to the SERVER, not to this client.");
+        }
+        else //else, just execute as any other client would.
+        {
+            //Now, store it on the message list buffer.
+            m_MessagesList.Add(received);
+            Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
+        }
+        
 
         //We need to begin receiving again, otherwise, it'd only receive once.
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
@@ -96,6 +107,7 @@ public class CClient : MonoBehaviour
                 //Start a server in this machine.
                 Debug.LogWarning("This machine will now host the server. Initializing.");
                 gameObject.AddComponent<CServer>(); //Add a CServer component to this gameObject, so a new Server starts. 
+                gameObject.GetComponent<CServer>().StartServer( this, m_setKnownClients ); //Send this client's set of known clients to the new server.
             }
             else
             {
@@ -110,6 +122,7 @@ public class CClient : MonoBehaviour
     void ProcessMessage()
     {
         //First, check if it is a recent message, or if you can have a 
+        //Check if the message belongs to you or the server.
     }
 
     int SelectNewServer()
