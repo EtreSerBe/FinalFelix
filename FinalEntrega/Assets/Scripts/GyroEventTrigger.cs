@@ -22,8 +22,6 @@ public class GyroEventTrigger : MonoBehaviour
 	/*< Timer to know if trying to do a combination. */
 	private float           m_fTimeCount;
 
-	/*< Flag to debug code with prints. */
-	public bool     m_bDebug;
 	/*< Limits of the axis. */
 	[Range(0,1)]
 	public float    m_fThresholds = 0.2f;
@@ -51,27 +49,22 @@ public class GyroEventTrigger : MonoBehaviour
 		{
 			if ( !IsGyroInsideThreshold( true, false ) )
 			{
-				if ( m_bDebug )
-					Debug.Log( "TIME_COUNT Started in axis X." );
 				m_fTimeCount = 0;
 				m_GPState = eGesturePhase.TIME_COUNT;
 				m_vMovedPos.x = ( m_vStartLooking.x - m_vActualGyroPos.x > m_fThresholds ) ? 1 : -1;
 			}
 			if ( !IsGyroInsideThreshold( false, true ) )
 			{
-				if ( m_bDebug )
-					Debug.Log( "TIME_COUNT Started in axis Y." );
 				m_fTimeCount = 0;
 				m_GPState = eGesturePhase.TIME_COUNT;
 				m_vMovedPos.y = ( m_vStartLooking.y - m_vActualGyroPos.y > m_fThresholds ) ? 1 : -1;
 			}
 		}
 		// Detect if it's near the start looking
-		else if ( m_GPState == eGesturePhase.TIME_OUT && IsGyroInsideThreshold( true, true ) )
+		if ( m_GPState == eGesturePhase.TIME_OUT && IsGyroInsideThreshold( true, true ) )
 		{
-			if ( m_bDebug )
-				Debug.Log( "Returned to Threshold, current state: SLEEP." );
 			m_GPState = eGesturePhase.SLEEP;
+			EventManager.TriggerEvent( eGyroEvents.THRESHOLD );
 		}
 
 		// If the player was not trying to move/stop.
@@ -80,8 +73,6 @@ public class GyroEventTrigger : MonoBehaviour
 			if ( m_fTimeCount > m_fMaxDetectTimeForReset )
 			{
 				m_GPState = eGesturePhase.TIME_OUT;
-				if ( m_bDebug )
-					Debug.Log( "TIME_OUT, need to return inside the Threshold." );
 
 				if ( m_vMovedPos.x != 0 )
 					EventManager.TriggerEvent( m_vMovedPos.x > 0 ? eGyroEvents.LEFT : eGyroEvents.RIGHT );

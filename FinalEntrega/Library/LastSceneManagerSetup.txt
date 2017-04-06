@@ -1,1 +1,4 @@
-sceneSetups: []
+sceneSetups:
+- path: Assets/Medieval_Toon_Character/Scenes/Example_Scene_Single_Character.unity
+  isLoaded: 1
+  isActive: 1
