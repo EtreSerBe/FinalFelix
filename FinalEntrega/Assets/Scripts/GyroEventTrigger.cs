@@ -28,7 +28,9 @@ public class GyroEventTrigger : MonoBehaviour
 	/*< Max time that player has to do a combination input. */
 	[Range(0,5)]
 	public float    m_fMaxDetectTimeForReset = 1f;
+	public float    m_fMaxInactiveTime = 1f;
 
+	float m_fLastStateUpdate = 0;
 	void Start( )
 	{
 		Screen.orientation = ScreenOrientation.LandscapeLeft;
@@ -40,6 +42,18 @@ public class GyroEventTrigger : MonoBehaviour
 
 	void Update( )
 	{
+		if( m_fLastStateUpdate > m_fMaxInactiveTime )
+		{
+			Debug.Log("Changed reference point.");
+			m_vStartLooking = GyroToUnityVec();
+			m_fLastStateUpdate = 0;
+		}
+
+		if ( m_GPState == eGesturePhase.SLEEP || m_GPState == eGesturePhase.TIME_OUT )
+			m_fLastStateUpdate += Time.deltaTime;
+		else
+			m_fLastStateUpdate = 0;
+
 		//If is outside of the threshold.
 		if ( m_GPState == eGesturePhase.TIME_COUNT )
 			m_fTimeCount += Time.deltaTime;
@@ -118,6 +132,7 @@ public class GyroEventTrigger : MonoBehaviour
 	 */
 	Vector3 GyroToUnityVec( )
 	{
+		//Vector3 q = m_CachedGyroscope.userAcceleration;
 		Quaternion q = m_CachedGyroscope.attitude;
 		return new Vector3( q.y, q.x, -q.z );//This depends on the orientation. (landscape)
 	}
@@ -130,4 +145,5 @@ public class GyroEventTrigger : MonoBehaviour
 		Quaternion q = m_CachedGyroscope.attitude;
 		return new Quaternion( q.y, q.x, -q.z, -q.w );//This depends on the orientation. (landscape)
 	}
+	
 }
