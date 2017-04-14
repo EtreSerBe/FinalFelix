@@ -79,7 +79,10 @@ public class CServer : MonoBehaviour
 {
 	/*< Cached server. */
 	static CServer m_CachedServer;
-	CThreadManager m_ThreadManager;
+    //CThreadManager m_ThreadManager;
+
+    public string m_szMulticastIP = "224.0.0.0";
+    public int m_iMulticastPort = 10000;
 
 	Socket  m_Socket,
 			m_SocketTick;
@@ -146,10 +149,30 @@ public class CServer : MonoBehaviour
 
         m_pClientRef = in_pClientRef;//Copy the reference, so it can be later used to use its socket to send and receive.
 
+        if (m_pClientRef.m_szMulticastIP == "224.0.0.0") //if it is equal to thge default Multicast address, then it's a complete new server-
+        {
+            //We generate a new one, so they don't use a "pre-known" IP address, so we can protect the system a little more.
+            int[] iRand = new int[4];
+            iRand[0] = UnityEngine.Random.Range(224, 239);
+            iRand[1] = UnityEngine.Random.Range(0, 255);
+            iRand[2] = UnityEngine.Random.Range(0, 255);
+            iRand[3] = UnityEngine.Random.Range(0, 255);
+            m_szMulticastIP = iRand[0].ToString() + "." + iRand[1].ToString() + "." + iRand[2].ToString() + "." + iRand[3].ToString(); //new composed address.
+            m_iMulticastPort = UnityEngine.Random.Range(10000, 11000);//some range of possible ports.
+        }
+        else //else, we adopt the previously stablished Address and port of the multicast group.
+        {
+            m_szMulticastIP = in_pClientRef.m_szMulticastIP;
+            m_iMulticastPort = in_pClientRef.m_iMulticastPort;
+        }
+
+        Debug.LogWarning("The IP Address and port for the Multicast group are:  " + m_szMulticastIP + " : " + m_iMulticastPort.ToString());
+
         m_setClientInfo.Clear();//Clear it from any possible trash from other executions o something else.
 
         m_setClientInfo = new HashSet<ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
-        m_iCurrentID = GetHighestID(); //The highest ID given in the elements of "m_setClientInfo".
+        m_iCurrentID = GetHighestID(); //The highest (lowest, in this case) ID given in the elements of "m_setClientInfo".
+
 
         //m_udpServer.BeginReceive(new AsyncCallback(ServerReceiveCallback), null); //To start receiving asynchronously.
         Debug.Log("Exit of StartServer function.");
@@ -177,6 +200,8 @@ public class CServer : MonoBehaviour
             {
                 case "Begin_Con": //Which is begin connection.
                     {
+                        //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
+                        //the request is made is not multicast enabled, UdpClient will throw a SocketException.
                         Debug.Log("A new client has requested to begin connection to this server.");
                         ClientInfo tmpInfo = new ClientInfo();
                         tmpInfo.m_iID = int.Parse( pActualMessage.m_szSenderID); //Serves as a casting to int.
@@ -193,6 +218,9 @@ public class CServer : MonoBehaviour
                             {
                                 //It means it is a completely new client, not registered before. So have to assign a new ID to it.
                                 tmpInfo.m_iID = GetNewID();
+
+                                //Send the IP of the multicast group to the new client, so it can join.
+                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, "Conn_Accepted", "")
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
@@ -248,73 +276,65 @@ public class CServer : MonoBehaviour
         return true;
     }
 
-	void openTCP( )
-	{
-		try
-		{
-			Socket tmpSocket = m_Socket.Accept();
-			if ( tmpSocket != null )
-			{
-				string ipAddress = ((IPEndPoint)tmpSocket.RemoteEndPoint).Address.ToString();
-				Debug.Log( ipAddress );
-				CClientHandler newClient = new CClientHandler( tmpSocket, ipAddress );
-				Thread newThread = new Thread( newClient.run );
-				m_lstClients.Add( newClient );
-				m_ThreadManager.AddThread( newClient.run );
-				newThread.Start();
-			}
-		}
-		catch ( SocketException e )
-		{
-			//Debug.Log( e );
-		}
-	}
-
-	void openUDP( )
-	{
-
-	}
+	//void openTCP( )
+	//{
+	//	try
+	//	{
+	//		Socket tmpSocket = m_Socket.Accept();
+	//		if ( tmpSocket != null )
+	//		{
+	//			string ipAddress = ((IPEndPoint)tmpSocket.RemoteEndPoint).Address.ToString();
+	//			Debug.Log( ipAddress );
+	//			CClientHandler newClient = new CClientHandler( tmpSocket, ipAddress );
+	//			Thread newThread = new Thread( newClient.run );
+	//			m_lstClients.Add( newClient );
+	//			m_ThreadManager.AddThread( newClient.run );
+	//			newThread.Start();
+	//		}
+	//	}
+	//	catch ( SocketException e )
+	//	{
+	//		//Debug.Log( e );
+	//	}
+	//}
+	//void openUDP( )
+	//{
+	//}
 }
 
-public class CThreadManager
-{
-	ArrayList m_lstThreads = new ArrayList();
-
-	public CThreadManager()
-	{
-
-	}
-
-	public void AddThread( ThreadStart in_function )
-	{
-		Thread newThread = new Thread( in_function );
-		m_lstThreads.Add( newThread );
-	}
-
-	public void EndThread( int in_ThreadNumber )
-	{
-		( (Thread)m_lstThreads[in_ThreadNumber] ).Interrupt();//If necessary use abort.
-		m_lstThreads.RemoveAt( in_ThreadNumber );
-	}
-}
+//public class CThreadManager
+//{
+//	ArrayList m_lstThreads = new ArrayList();
+//	public CThreadManager()
+//	{
+//	}
+//	public void AddThread( ThreadStart in_function )
+//	{
+//		Thread newThread = new Thread( in_function );
+//		m_lstThreads.Add( newThread );
+//	}
+//	public void EndThread( int in_ThreadNumber )
+//	{
+//		( (Thread)m_lstThreads[in_ThreadNumber] ).Interrupt();//If necessary use abort.
+//		m_lstThreads.RemoveAt( in_ThreadNumber );
+//	}
+//}
 
 
-public class CClientHandler
-{
-	Socket m_Socket;
-	string m_strIpAddress;
-
-	public CClientHandler( Socket in_Socket, string in_strIpAddress )
-	{
-		m_Socket = in_Socket;
-		m_strIpAddress = in_strIpAddress;
-	}
-
-	public void run( )
-	{
-		while ( true )
-		{
-			Debug.Log( "Update: " + m_strIpAddress );
-		}
-	}
-}
+//public class CClientHandler
+//{
+//	Socket m_Socket;
+//	string m_strIpAddress;
+//	public CClientHandler( Socket in_Socket, string in_strIpAddress )
+//	{
+//		m_Socket = in_Socket;
+//		m_strIpAddress = in_strIpAddress;
+//	}
+//	public void run( )
+//	{
+//		while ( true )
+//		{
+//			Debug.Log( "Update: " + m_strIpAddress );
+//		}
+//	}
+//}

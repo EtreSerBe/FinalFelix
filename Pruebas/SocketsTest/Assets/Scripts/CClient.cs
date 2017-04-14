@@ -26,6 +26,8 @@ public class CClient : MonoBehaviour
 
     CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
+    public string m_szMulticastIP = "224.0.0.0"; //set by default, the Server might change it for security purposes.
+    public int m_iMulticastPort = 10000;
 
     //CServer m_ServerReference:
 
@@ -36,6 +38,7 @@ public class CClient : MonoBehaviour
         m_udpClient = new UdpClient( 10000 );
         m_szClientIP = m_udpClient.Client.LocalEndPoint.ToString();
         m_udpClient.EnableBroadcast = true;
+        
 
         try
         {
@@ -94,6 +97,15 @@ public class CClient : MonoBehaviour
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
     }
 
+    private void sendCallback(IAsyncResult res)
+    {
+        Debug.Log("Entered sendCallback function, Callback for the BeginSend function.");
+        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
+        Debug.Log("Number of bytes sent by: " + m_szClientIP +  " were: " + m_udpClient.EndSend(res));
+        Debug.Log("Exit sendCallback function, Callback for the BeginSend function.");
+    }
+
+
     //I still have my doubts about this one, maybe it should have other parameters as well.
     public void SendUDPMessage(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent, IPAddress in_Address, int in_iPort  )
     {
@@ -104,7 +116,8 @@ public class CClient : MonoBehaviour
         Debug.Log("Sending a message to Endpoint: " + in_Address.ToString() + " and port: " + in_iPort );
         //Send a message to the server.
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(in_Address, in_iPort);
-        m_udpClient.Send(msgBytes, msgBytes.Length, RemoteIpEndPoint);//Do the broadcast.
+        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the broadcast.
+       
     }
 
     // Update is called once per frame
@@ -150,6 +163,78 @@ public class CClient : MonoBehaviour
     {
         //First, check if it is a recent message, or if you can have a 
         //Check if the message belongs to you or the server.
+
+        while (m_MessagesList.Count != 0)
+        {
+            Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.
+            m_MessagesList.RemoveAt(0); //Then, remove it from the container.
+
+            Debug.Log("Processing message with contents: " + pActualMessage.ToString());
+
+            //Check which type of message is.
+            switch (pActualMessage.m_szMessageType)
+            {
+                case "Begin_Con": //Which is begin connection.
+                    {
+                        //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
+                        //the request is made is not multicast enabled, UdpClient will throw a SocketException.
+                        Debug.Log("A new client has requested to begin connection to this server.");
+                        ClientInfo tmpInfo = new ClientInfo();
+                        tmpInfo.m_iID = int.Parse(pActualMessage.m_szSenderID); //Serves as a casting to int.
+
+                        tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
+
+                        Debug.Log("That client's IP Address is : " + tmpInfo.m_szIPAdress);
+
+                        //If it has not been registered as a connected client, then, add it to the list.
+                        if (IsNewIPAddress(tmpInfo))
+                        {
+                            //This means it is new to this server. Check if it was already registered to another one. Do it by checking its ID.
+                            if (tmpInfo.m_iID == 0)
+                            {
+                                //It means it is a completely new client, not registered before. So have to assign a new ID to it.
+                                tmpInfo.m_iID = GetNewID();
+
+                                //Now, send a message to that user, confirming its connection was successful. 
+                                Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
+                            }
+                            else // else, it means that the client had an ID assigned by the previous server, but this machine didn't know about it. 
+                            {
+                                //So, we just add it to the set, without incrementing the Current ID.
+                                //First, check if it is a lower ID than the Highest one this server knows.
+                                if (tmpInfo.m_iID > m_iCurrentID)
+                                    Debug.LogError("A client with an ID higher than the actual known highest ID has arrived, please corroborate this.");
+
+                                Debug.Log("An old Client has been added to the hash.");
+                                //In any case, add it.
+                            }
+
+                            //Add it to the Set of ClientsInfo.
+                            m_setClientInfo.Add(tmpInfo);
+
+                            //SEND TO EVERYONE ON THE GROUP.
+                            /*********/
+                            //TO DO 
+                            Debug.Log("Sending to everyone else the info about the recently connected client.");
+                            //PUT THE SEND COMMAND TO THE Multicast Group.
+
+                        }
+                        else
+                        {
+                            Debug.Log("Someone who is already connected tried to connect. Its address is: " + tmpInfo.m_szIPAdress);
+                        }
+                    }
+                    break;
+
+
+            }
+
+            //Begin connection message.
+
+            //In-game message, such as action performed.
+
+
+        }
     }
 
     int SelectNewServer()
