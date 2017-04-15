@@ -81,18 +81,18 @@ public class CServer : MonoBehaviour
 	static CServer m_CachedServer;
     //CThreadManager m_ThreadManager;
 
-    public string m_szMulticastIP = "224.0.0.0";
+    public string m_szMulticastIP = "223.0.0.0"; //default INVALID Multicast IP for this program.
     public int m_iMulticastPort = 10000;
 
-	Socket  m_Socket,
-			m_SocketTick;
+	//Socket  m_Socket,
+	//		m_SocketTick;
 
     //Supposedly, this one will no longer be necessary.
     UdpClient m_udpServer;
 
     public CClient m_pClientRef = null;
 
-	ArrayList m_lstClients = new ArrayList();
+	//ArrayList m_lstClients = new ArrayList();
     //Used to store information about the connected clients to this server.
     //List<ClientInfo> m_lstClientInfo = new List<ClientInfo>();
     HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
@@ -149,7 +149,7 @@ public class CServer : MonoBehaviour
 
         m_pClientRef = in_pClientRef;//Copy the reference, so it can be later used to use its socket to send and receive.
 
-        if (m_pClientRef.m_szMulticastIP == "224.0.0.0") //if it is equal to thge default Multicast address, then it's a complete new server-
+        if (m_pClientRef.m_szMulticastIP == "223.0.0.0") //if it is equal to thge default Multicast address, then it's a complete new server-
         {
             //We generate a new one, so they don't use a "pre-known" IP address, so we can protect the system a little more.
             int[] iRand = new int[4];
@@ -202,7 +202,7 @@ public class CServer : MonoBehaviour
                     {
                         //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
                         //the request is made is not multicast enabled, UdpClient will throw a SocketException.
-                        Debug.Log("A new client has requested to begin connection to this server.");
+                        Debug.Log("Entered Begin_Con case. A new client has requested to begin connection to this server.");
                         ClientInfo tmpInfo = new ClientInfo();
                         tmpInfo.m_iID = int.Parse( pActualMessage.m_szSenderID); //Serves as a casting to int.
 
@@ -219,11 +219,15 @@ public class CServer : MonoBehaviour
                                 //It means it is a completely new client, not registered before. So have to assign a new ID to it.
                                 tmpInfo.m_iID = GetNewID();
 
-                                //Send the IP of the multicast group to the new client, so it can join.
-                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, "Conn_Accepted", "")
+                                //Send the IP of the multicast group to the new client, so it can join. Also, its new ID for inside the group.
+                                //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
+                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString()));
+                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, IPAddress.Parse(pActualMessage.m_szTargetAddress), 10000); //send it by the default port: 10000
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
+                                m_pClientRef.SendUDPMessage('N', "New_User", tmpInfo.m_iID.ToString() + "\t" + pActualMessage.m_szTargetAddress, IPAddress.Parse(m_szMulticastIP), m_iMulticastPort); //send it to the multicast group.
+
                             }
                             else // else, it means that the client had an ID assigned by the previous server, but this machine didn't know about it. 
                             {
@@ -237,6 +241,7 @@ public class CServer : MonoBehaviour
                             }
 
                             //Add it to the Set of ClientsInfo.
+                            //NOTE:::: Maybe it's not necessary anymore. 15 / april 2017
                             m_setClientInfo.Add(tmpInfo);
 
                             //SEND TO EVERYONE ON THE GROUP.
@@ -250,6 +255,12 @@ public class CServer : MonoBehaviour
                         {
                             Debug.Log("Someone who is already connected tried to connect. Its address is: " + tmpInfo.m_szIPAdress);
                         }
+                        Debug.Log("Exit Begin_Con case in the server.");
+                    }
+                    break;
+                default:
+                    {
+                        Debug.LogError("ERROR: The server received a pActualMessage.m_szMessageType with value: " + pActualMessage.m_szMessageType);
                     }
                     break;
 

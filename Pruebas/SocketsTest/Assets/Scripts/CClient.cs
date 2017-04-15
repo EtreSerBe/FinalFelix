@@ -26,8 +26,10 @@ public class CClient : MonoBehaviour
 
     CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
-    public string m_szMulticastIP = "224.0.0.0"; //set by default, the Server might change it for security purposes.
+    public string m_szMulticastIP = "223.0.0.0"; //set by default, the Server might change it for security purposes.
     public int m_iMulticastPort = 10000;
+
+
 
     //CServer m_ServerReference:
 
@@ -38,6 +40,7 @@ public class CClient : MonoBehaviour
         m_udpClient = new UdpClient( 10000 );
         m_szClientIP = m_udpClient.Client.LocalEndPoint.ToString();
         m_udpClient.EnableBroadcast = true;
+        m_udpClient.MulticastLoopback = true; //Necessary so it receives its own messages in the multicast.
         
 
         try
@@ -55,36 +58,36 @@ public class CClient : MonoBehaviour
         }
     }
 
+    //This is a custom implementation to customize the parameters it uses to receive messages.
+    public void BeginReceive(string in_szAddress, int in_iPort)
+    {
+
+    }
+
     //CallBack, it's automatically called when the socket receives anything.
     private void recv(IAsyncResult res)
     {
         Debug.Log("Entered recv function, Callback for the BeginReceive function.");
-        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
-        byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
+        IPEndPoint RemoteIpEndPoint;
 
-        
-
-        //Process codes
-        Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
-
-        Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
-
-        //Decode the "time" or something like that so it helps filter old messages.
-        //this is to be able to sort the messageList according to how old they are.
-
-        //First, check if it is for the client or for the server (if this machine happens to be the server too).
-        //PENDING****************
-        if (m_pServer != null && pReceivedMessage.m_cIsForServer == 'Y')
+        if (m_pServer != null || m_iID == 0) //it this one is also server OR it has not been added to the group
         {
-            //Then, it means it is destined for the server part, not the client. And the server ir running on this machine.
-            m_pServer.m_MessagesList.Add(pReceivedMessage);
-            Debug.Log("The message just got passed to the SERVER, not to this client.");
+            RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
+            byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
+            Debug.Log("The received data BY BROADCAST was: " + Encoding.UTF8.GetString(received));
+            Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
+            DispatchMessageToServer(pReceivedMessage); //pass it to the server part.
         }
-        else //else, just execute as any other client would.
+        if ( m_iID != 0 )
         {
-            //NOTE: CHECK IF A CLIENT SHOULD RECEIVE ITS OWN MESSAGES.
+            RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(m_szMulticastIP), m_iMulticastPort);
+            byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
+            Debug.Log("The received data BY MULTICAST GROUP was: " + Encoding.UTF8.GetString(received));
+
+            Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
+            //NOTE:::: CHECK IF A CLIENT SHOULD RECEIVE ITS OWN MESSAGES.
             if (pReceivedMessage.m_szSenderID != m_iID.ToString())
-            { 
+            {
                 //Now, store it on the message list buffer.
                 m_MessagesList.Add(pReceivedMessage);
                 Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
@@ -92,15 +95,40 @@ public class CClient : MonoBehaviour
                 m_fTimeSinceLastResponse = 0.0f;
             }
         }
-        
+               
         //We need to begin receiving again, otherwise, it'd only receive once.
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
+    }
+
+    //This one is used to differentiate between messages to the server and messages received by someone who is trying to access the service.
+    private void DispatchMessageToServer( Message in_pDispatchMessage )
+    {
+        //Decode the "time" or something like that so it helps filter old messages.
+        //this is to be able to sort the messageList according to how old they are.
+        //First, check if it is for the client or for the server (if this machine happens to be the server too).
+        if (m_pServer != null && in_pDispatchMessage.m_cIsForServer == 'Y')
+        {
+            //Then, it means it is destined for the server part, not the client. And the server ir running on this machine.
+            m_pServer.m_MessagesList.Add(in_pDispatchMessage);
+            Debug.Log("The message just got passed to the SERVER, not to this client.");
+        }
+        else //else, just execute as any other client would.
+        {
+            //NOTE: CHECK IF A CLIENT SHOULD RECEIVE ITS OWN MESSAGES.
+            if (in_pDispatchMessage.m_szSenderID != m_iID.ToString())
+            {
+                //Now, store it on the message list buffer.
+                m_MessagesList.Add(in_pDispatchMessage);
+                Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
+                //Also, reset the time since the last message was received.
+                m_fTimeSinceLastResponse = 0.0f;
+            }
+        }
     }
 
     private void sendCallback(IAsyncResult res)
     {
         Debug.Log("Entered sendCallback function, Callback for the BeginSend function.");
-        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000);
         Debug.Log("Number of bytes sent by: " + m_szClientIP +  " were: " + m_udpClient.EndSend(res));
         Debug.Log("Exit sendCallback function, Callback for the BeginSend function.");
     }
@@ -118,6 +146,12 @@ public class CClient : MonoBehaviour
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(in_Address, in_iPort);
         m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the broadcast.
        
+    }
+
+    //facility to be a little more organized.
+    public void SendUDPMessage(Message in_pMessage, IPAddress in_Address, int in_iPort)
+    {
+        SendUDPMessage(in_pMessage.m_cIsForServer, in_pMessage.m_szMessageType, in_pMessage.m_szMessageContent, in_Address, in_iPort);
     }
 
     // Update is called once per frame
@@ -169,60 +203,51 @@ public class CClient : MonoBehaviour
             Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
 
-            Debug.Log("Processing message with contents: " + pActualMessage.ToString());
+            Debug.Log("Processing message with info: " + pActualMessage.ToString());
 
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
             {
-                case "Begin_Con": //Which is begin connection.
+                case "Conn_Accepted": //Which is when the begin connection has been accepted by the leader.
                     {
-                        //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
-                        //the request is made is not multicast enabled, UdpClient will throw a SocketException.
-                        Debug.Log("A new client has requested to begin connection to this server.");
-                        ClientInfo tmpInfo = new ClientInfo();
-                        tmpInfo.m_iID = int.Parse(pActualMessage.m_szSenderID); //Serves as a casting to int.
-
-                        tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
-
-                        Debug.Log("That client's IP Address is : " + tmpInfo.m_szIPAdress);
-
-                        //If it has not been registered as a connected client, then, add it to the list.
-                        if (IsNewIPAddress(tmpInfo))
+                        Debug.Log("Entered Conn_Accepted case.");
+                        string [] ConnAcceptedContent = pActualMessage.m_szMessageContent.Split('\t');
+                        // 1 is the multicastIP ; 2 is the Multicast port; 3 is the newID for this client.
+                        if (ConnAcceptedContent.Length != 3) // see that there must be 3 parameters in the content of this message.
                         {
-                            //This means it is new to this server. Check if it was already registered to another one. Do it by checking its ID.
-                            if (tmpInfo.m_iID == 0)
-                            {
-                                //It means it is a completely new client, not registered before. So have to assign a new ID to it.
-                                tmpInfo.m_iID = GetNewID();
-
-                                //Now, send a message to that user, confirming its connection was successful. 
-                                Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
-                            }
-                            else // else, it means that the client had an ID assigned by the previous server, but this machine didn't know about it. 
-                            {
-                                //So, we just add it to the set, without incrementing the Current ID.
-                                //First, check if it is a lower ID than the Highest one this server knows.
-                                if (tmpInfo.m_iID > m_iCurrentID)
-                                    Debug.LogError("A client with an ID higher than the actual known highest ID has arrived, please corroborate this.");
-
-                                Debug.Log("An old Client has been added to the hash.");
-                                //In any case, add it.
-                            }
-
-                            //Add it to the Set of ClientsInfo.
-                            m_setClientInfo.Add(tmpInfo);
-
-                            //SEND TO EVERYONE ON THE GROUP.
-                            /*********/
-                            //TO DO 
-                            Debug.Log("Sending to everyone else the info about the recently connected client.");
-                            //PUT THE SEND COMMAND TO THE Multicast Group.
-
+                            Debug.LogError("The -m_szMessageContent- of a Conn_Accepted message is not in the correct format. It was: " + pActualMessage.m_szMessageContent);
                         }
                         else
                         {
-                            Debug.Log("Someone who is already connected tried to connect. Its address is: " + tmpInfo.m_szIPAdress);
+                            m_szMulticastIP = ConnAcceptedContent[0];
+                            m_iMulticastPort = int.Parse(ConnAcceptedContent[1]);
+                            m_iID = int.Parse(ConnAcceptedContent[2]);
+                            //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
+                            //the request is made is not multicast enabled, UdpClient will throw a SocketException.
+                            Debug.Log("A connection has been accepted. This client: " + m_szClientIP + " will join the multicast Group: " + m_szMulticastIP + " in port: " + m_iMulticastPort.ToString());
                         }
+                        Debug.Log("Exit Conn_Accepted case.");
+                    }
+                    break;
+                case "New_User":
+                    {
+                        Debug.Log("Entered New_User case.");
+                        string[] NewUserContent = pActualMessage.m_szMessageContent.Split('\t');
+                        // 1 is the new user ID ; 2 is the new user IP.
+                        if (NewUserContent.Length != 2) // see that there must be 3 parameters in the content of this message.
+                        {
+                            Debug.LogError("The -m_szMessageContent- of a New_User message is not in the correct format. It was: " + pActualMessage.m_szMessageContent);
+                        }
+                        else
+                        {
+                            ClientInfo tmpNewClient = new ClientInfo();
+                            tmpNewClient.m_iID = int.Parse(NewUserContent[0]);
+                            tmpNewClient.m_szIPAdress = NewUserContent[1];
+                            Debug.Log("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
+                            m_setKnownClients.Add(tmpNewClient); //we add it to the set of known clients.
+                            Debug.Log("This client now knows: " + m_setKnownClients.Count + " Clients.");
+                        }
+                        Debug.Log("Exit New_User case.");
                     }
                     break;
 
