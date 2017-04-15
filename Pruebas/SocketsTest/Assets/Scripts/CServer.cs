@@ -21,11 +21,11 @@ public struct Message
     {
         string tmpString = Encoding.UTF8.GetString(in_receivedBytes);
         Debug.Log("Constructing a Message with: " + tmpString);
-        string[] tmpValuesArray = tmpString.Split('\t'); //Gives us 5 parts so we can use each one as one of the variables of this object.
+        string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  5); //Gives us 5 parts so we can use each one as one of the variables of this object.
         if ( tmpValuesArray.Length != 5 )
         {
             //Then, the received bytes did not have the correct format (which is, containing 4 tabs '\t' to addecuately make the split).
-            Debug.LogError("A message was constructed without the correct information. ");
+            Debug.LogError("A message was constructed without the correct information. it was:  " + tmpString);
             m_cIsForServer = '0';
             m_szSenderID = null;
             m_szTargetAddress = null;
@@ -78,7 +78,7 @@ public struct ClientInfo
 public class CServer : MonoBehaviour
 {
 	/*< Cached server. */
-	static CServer m_CachedServer;
+	//static CServer m_CachedServer;
     //CThreadManager m_ThreadManager;
 
     public string m_szMulticastIP = "223.0.0.0"; //default INVALID Multicast IP for this program.
@@ -98,11 +98,12 @@ public class CServer : MonoBehaviour
     HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
     public List<Message> m_MessagesList = new List<Message>();
 
-    private int m_iCurrentID = 0;
+    private int m_iCurrentID = 1;
 
     private int GetNewID()
     {
-        return m_iCurrentID++;
+        m_iCurrentID++;
+        return m_iCurrentID;
     }
 
     private int GetHighestID()
@@ -116,15 +117,15 @@ public class CServer : MonoBehaviour
         return iHighest;
     }
 
-    public static CServer CachedServer
+    /*public static CServer CachedServer
 	{
 		get { return m_CachedServer; }
-	}
+	}*/
 
 	void Awake( )
 	{
 		//m_ThreadManager = new CThreadManager();
-		m_CachedServer = this;
+		//m_CachedServer = this;
 
 		//m_Socket = new Socket( AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
 		////m_SocketTick = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
@@ -218,11 +219,12 @@ public class CServer : MonoBehaviour
                             {
                                 //It means it is a completely new client, not registered before. So have to assign a new ID to it.
                                 tmpInfo.m_iID = GetNewID();
+                                Debug.LogWarning("The new ID generated is: " + tmpInfo.m_iID);
 
                                 //Send the IP of the multicast group to the new client, so it can join. Also, its new ID for inside the group.
                                 //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
                                 Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString()));
-                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, IPAddress.Parse(pActualMessage.m_szTargetAddress), 10000); //send it by the default port: 10000
+                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Broadcast, 10000); //send it by the default port: 10000
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
