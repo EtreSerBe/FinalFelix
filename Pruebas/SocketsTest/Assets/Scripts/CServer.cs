@@ -67,19 +67,13 @@ public struct ClientInfo
 {
     public int m_iID;
     public String m_szIPAdress;
-    public DateTime m_dtTimeSinceLastMessage; //used to decide if that client must be considered INACTIVE (or disconnected).
-
+   
     //Constructor which by defaults set the TimeSinceLastMessage value to DateTime.Now.
     public ClientInfo( int in_iID, string in_szIPAddress )
     {
         m_iID = in_iID;
         m_szIPAdress = in_szIPAddress;
-        m_dtTimeSinceLastMessage = DateTime.Now;
-    }
-
-    public void SetTimeSinceLastMessage(DateTime in_Time)
-    {
-        m_dtTimeSinceLastMessage = in_Time;
+        //m_dtTimeSinceLastMessage = DateTime.Now;
     }
 
     public override int GetHashCode()
@@ -89,28 +83,45 @@ public struct ClientInfo
     //Need anything else?
 };
 
+public struct ClientTimers
+{
+    public DateTime m_dtTimeSinceLastMessage; //used to decide if that client must be considered INACTIVE.
+    public DateTime m_dtTimeSinceLastHeartBeat; //used to decide if that client must be considered DISCONNECTED.
+
+    public void SetTimeSinceLastMessage(DateTime in_Time)
+    {
+        m_dtTimeSinceLastMessage = in_Time;
+    }
+    public void SetTimeSinceLastHeartBeat(DateTime in_Time)
+    {
+        m_dtTimeSinceLastHeartBeat = in_Time;
+    }
+};
+
 public class CServer : MonoBehaviour
 {
-	/*< Cached server. */
-	//static CServer m_CachedServer;
+    /*< Cached server. */
+    //static CServer m_CachedServer;
     //CThreadManager m_ThreadManager;
 
     public string m_szMulticastIP = "223.0.0.0"; //default INVALID Multicast IP for this program.
     public int m_iMulticastPort = 10000;
+    public float m_fMaxTimeSinceLastHeartBeat = 10.0f;// Value which, when exceeded, will cause the server to disconnect the given user.
 
-	//Socket  m_Socket,
-	//		m_SocketTick;
+    //Socket  m_Socket,
+    //		m_SocketTick;
 
     //Supposedly, this one will no longer be necessary.
     UdpClient m_udpServer;
 
     public CClient m_pClientRef = null;
 
-	//ArrayList m_lstClients = new ArrayList();
+    //ArrayList m_lstClients = new ArrayList();
     //Used to store information about the connected clients to this server.
     //List<ClientInfo> m_lstClientInfo = new List<ClientInfo>();
     //HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
     Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
+    public Dictionary<string, ClientTimers> m_dicClientTimers = new Dictionary<string, ClientTimers>(); //This one is exclusive to the server, so it is separated from ClientInfo, which was previously joint.
     public List<Message> m_MessagesList = new List<Message>();
 
     private int m_iCurrentID = 1;
@@ -155,6 +166,76 @@ public class CServer : MonoBehaviour
 		//newThread.Start();
 		//newThread2.Start();
 	}
+
+    //This coroutine is used by the Server Machine to decide if a user has gone DISCONNECTED.
+    public IEnumerator CheckHeartBeatCoroutine(string in_szIPAddress)
+    {
+        yield return new WaitForSeconds(m_fMaxTimeSinceLastHeartBeat);
+        //Now, we dow our checking.
+        ClientTimers OutClientInfo;
+        if (!m_dicClientTimers.TryGetValue(in_szIPAddress, out OutClientInfo))
+        {
+            Debug.LogWarning("Warning, checking the Timeout HeartBeat for a client which is not registered on the KnownClients Dictionary.");
+        }
+
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
+        if ((TimeDiff.Seconds >= m_fMaxTimeSinceLastHeartBeat) //if more
+            || TimeDiff.Minutes > 0) //if more than a minute has elapsed since last heartbeat, disconnect that user.
+        {
+            //TO DO: Send the notification to all users.
+            //Then, this user is to be considered Inactive, and therefore removed from the group.
+            Debug.LogWarning("Warning, the user with IP: " + in_szIPAddress + " is NON-RESPONSIVE TO HEARTBEAT and will be removed from the group.");
+            bool bRemovalSuccess = m_dicKnownClients.Remove(in_szIPAddress);
+            m_dicClientTimers.Remove(in_szIPAddress);//also remove it from the Timers info.
+            Debug.Log("The removal of the client was: " + bRemovalSuccess.ToString());
+        }
+    }
+
+    //This coroutine is used by the Server Machine to decide if a user has gone Inactive.
+    public IEnumerator CheckTimeSinceLastMessageCoroutine(string in_szIPAddress)
+    {
+        yield return new WaitForSeconds(m_pClientRef.m_iMaxMinutesSinceLastResponse * 60.0f + (float)m_pClientRef.m_iMaxSecondsSinceLastResponse);
+        //Now, we dow our checking.
+        ClientTimers OutClientInfo;
+        if (!m_dicClientTimers.TryGetValue(in_szIPAddress, out OutClientInfo))
+        {
+            Debug.LogWarning("Warning, checking the Timeout for a client which is not registered on the KnownClients Dictionary.");
+        }
+
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
+        if ((TimeDiff.Minutes == m_pClientRef.m_iMaxMinutesSinceLastResponse && TimeDiff.Seconds >= m_pClientRef.m_iMaxSecondsSinceLastResponse) //if more
+            || TimeDiff.Minutes > m_pClientRef.m_iMaxMinutesSinceLastResponse)
+        {
+            //TO DO: Send the notification to all users.
+            //Then, this user is to be considered Inactive, and therefore removed from the group.
+            Debug.LogWarning("Warning, the user with IP: " + in_szIPAddress + " is INACTIVE IN GAME and will be removed from the group.");
+            bool bRemovalSuccess = m_dicKnownClients.Remove(in_szIPAddress);
+            m_dicClientTimers.Remove(in_szIPAddress);//remove it from the timers info too.
+            Debug.Log("The removal of the client was: " + bRemovalSuccess.ToString());
+        }
+    }
+
+    public void UpdateLastMessageFromAddress(string in_szAddress)
+    {
+        //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
+        Debug.Log("Server is resseting the INACTIVITY timeout for client with IP: " + in_szAddress);
+        //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
+        StopCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
+        m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+          //Then, we manage the times since this user last sent a message.
+        StartCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
+    }
+
+    public void UpdateLastHeartBeatFromAddress(string in_szAddress)
+    {
+        //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
+        Debug.Log("Server is resseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
+        //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
+        StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
+        m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+        //Then, we manage the times since this user last sent a message.
+        StartCoroutine(CheckHeartBeatCoroutine(in_szAddress));
+    }
 
     //Starts this component as the active server.
     public void StartServer( CClient in_pClientRef,  Dictionary<string , ClientInfo> in_refKnownClients)
@@ -210,15 +291,11 @@ public class CServer : MonoBehaviour
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
 
             Debug.Log("Processing message with contents: " + pActualMessage.ToString());
-
-            
             ClientInfo tmpInfo = new ClientInfo();
             tmpInfo.m_iID = int.Parse(pActualMessage.m_szSenderID); //Serves as a casting to int.
-
             tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
 
-            Debug.Log("That client's IP Address is : " + tmpInfo.m_szIPAdress);
-
+            Debug.Log("SERVER SAYS: That client's IP Address is : " + tmpInfo.m_szIPAdress);
 
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
@@ -237,12 +314,12 @@ public class CServer : MonoBehaviour
                             {
                                 //It means it is a completely new client, not registered before. So have to assign a new ID to it.
                                 tmpInfo.m_iID = GetNewID();
-                                Debug.LogWarning("The new ID generated is: " + tmpInfo.m_iID);
+                                Debug.LogWarning("The new ID generated is: " + tmpInfo.m_iID + " for the client with IP" + pActualMessage.m_szTargetAddress);
 
                                 //Send the IP of the multicast group to the new client, so it can join. Also, its new ID for inside the group.
                                 //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
-                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString()));
-                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Broadcast, 10000); //send it by the default port: 10000
+                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP,  pActualMessage.m_szTargetAddress, "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
+                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Parse(pActualMessage.m_szTargetAddress), 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
@@ -262,12 +339,13 @@ public class CServer : MonoBehaviour
 
                             //Add it to the Set of ClientsInfo.
                             //NOTE:::: Maybe it's not necessary anymore. 15 / april 2017
+                            //NOTE:::: WE NEED TO SEND THE WHOLE INFO TO THE NEW CLIENT! 16/4/2017
                             m_dicKnownClients.Add(tmpInfo.m_szIPAdress, tmpInfo);
 
                             //SEND TO EVERYONE ON THE GROUP.
                             /*********/
                             //TO DO 
-                            Debug.Log("Sending to everyone else the info about the recently connected client.");
+                            Debug.Log("TODO-----Sending to everyone else the info about the recently connected client.");
                             //PUT THE SEND COMMAND TO THE Multicast Group.
 
                         }
@@ -287,7 +365,8 @@ public class CServer : MonoBehaviour
                         }
                         else
                         {
-                            m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Parse(m_szMulticastIP), 10000);//10000 port by default
+                            UpdateLastHeartBeatFromAddress(tmpInfo.m_szIPAdress);//Update the time since we received the last Heartbeat from this address.
+                            m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , IPAddress.Parse(tmpInfo.m_szIPAdress) /*IPAddress.Parse(m_szMulticastIP)*/, 10000);//10000 port by default
                         }
                         Debug.Log("Exit HeartBeat case on the server");
                     }
