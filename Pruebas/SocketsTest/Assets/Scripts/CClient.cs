@@ -16,6 +16,7 @@ public class CClient : MonoBehaviour
     public bool m_bAutoReceiveMessages = true; //Deactivate this to stop this client from receiving its own messages.
     public int m_iMaxMinutesSinceLastResponse = 0;
     public int m_iMaxSecondsSinceLastResponse = 15;
+    public float m_fHeartBeatMessageInterval = 2.5f;
 
     bool bDisconnected = false;//This value must be modified when a first response of the server/host is received.
     public int m_iID = 0; //ID value used to identify the clients from the Server's perspective.
@@ -51,11 +52,11 @@ public class CClient : MonoBehaviour
         }
 
         //Client uses as receive udp client
-        m_udpClient = new UdpClient( 10000 );
+        m_udpClient = new UdpClient( 10000);
        
         m_udpClient.EnableBroadcast = true;
         m_udpClient.MulticastLoopback = true; //Necessary so it receives its own messages in the multicast.
-        
+        //Debug.Log("The updClients ExclusiveAddressUse value is: " + m_udpClient.ExclusiveAddressUse.ToString());// it must false;
 
         try
         {
@@ -70,12 +71,6 @@ public class CClient : MonoBehaviour
         {
             Debug.Log("caught exception : " + e.ToString());
         }
-    }
-
-    //This is a custom implementation to customize the parameters it uses to receive messages.
-    public void BeginReceive(string in_szAddress, int in_iPort)
-    {
-
     }
 
     public IEnumerator CheckTimeSinceLastMessageCoroutine(string in_szIPAddress)
@@ -104,11 +99,14 @@ public class CClient : MonoBehaviour
     {
         Debug.Log("Entered recv function, Callback for the BeginReceive function.");
         IPEndPoint RemoteIpEndPoint;
+        //Also, reset the time since the last message was received.
+        m_fTimeSinceLastResponse = 0.0f;
 
         if (m_pServer != null || m_iID == 0) //it this one is also server OR it has not been added to the group
         {
             RemoteIpEndPoint = new IPEndPoint(IPAddress.Broadcast, 10000);
             byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
+            m_udpClient.BeginReceive(new AsyncCallback(recv), null);
             Debug.Log("The received data BY BROADCAST was: " + Encoding.UTF8.GetString(received));
             Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
             DispatchMessageToServer(pReceivedMessage); //pass it to the server part.
@@ -117,6 +115,7 @@ public class CClient : MonoBehaviour
         {
             RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(m_szMulticastIP), m_iMulticastPort);
             byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
+            m_udpClient.BeginReceive(new AsyncCallback(recv), null);
             Debug.Log("The received data BY MULTICAST GROUP was: " + Encoding.UTF8.GetString(received));
 
             Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
@@ -137,13 +136,12 @@ public class CClient : MonoBehaviour
                 //Now, store it on the message list buffer.
                 m_MessagesList.Add(pReceivedMessage);
                 Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
-                //Also, reset the time since the last message was received.
-                m_fTimeSinceLastResponse = 0.0f;
+
             }
         }
 
         //We need to begin receiving again, otherwise, it'd only receive once.
-        m_udpClient.BeginReceive(new AsyncCallback(recv), null);
+        
     }
 
     //This one is used to differentiate between messages to the server and messages received by someone who is trying to access the service.
@@ -194,10 +192,31 @@ public class CClient : MonoBehaviour
        
     }
 
+
+
     //facility to be a little more organized.
     public void SendUDPMessage(Message in_pMessage, IPAddress in_Address, int in_iPort)
     {
         SendUDPMessage(in_pMessage.m_cIsForServer, in_pMessage.m_szMessageType, in_pMessage.m_szMessageContent, in_Address, in_iPort);
+    }
+
+    //This one uses the defined Multicast Address and port to send, so it's less tedious to use.
+    public void SendUDPMessageToGroup(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent )
+    {
+        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szMessageContent);
+
+        byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+
+        Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort);
+        //Send a message to the server.
+        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse( m_szMulticastIP), m_iMulticastPort);
+        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the broadcast.
+    }
+
+    void HeartBeatSend()
+    {
+        Debug.Log("Sending HeartBeat message to Server. This is invoked repeatedly.");
+        SendUDPMessageToGroup('Y', "HeartBeat", "Empty"); //NOTE:: THIS WOULD BE BETTER IF ONLY SENT TO SERVER.
     }
 
     // Update is called once per frame
@@ -205,9 +224,6 @@ public class CClient : MonoBehaviour
     {
         //Check if a new message has arrived.
         //If it has, process it.
-
-
-
 
         m_fTimeSinceLastResponse += Time.deltaTime;
 
@@ -268,6 +284,7 @@ public class CClient : MonoBehaviour
                 case "Conn_Accepted": //Which is when the begin connection has been accepted by the leader.
                     {
                         Debug.Log("Entered Conn_Accepted case.");
+
                         string [] ConnAcceptedContent = pActualMessage.m_szMessageContent.Split('\t');
                         // 1 is the multicastIP ; 2 is the Multicast port; 3 is the newID for this client.
                         if (ConnAcceptedContent.Length != 3) // see that there must be 3 parameters in the content of this message.
@@ -276,6 +293,9 @@ public class CClient : MonoBehaviour
                         }
                         else
                         {
+                            bDisconnected = false;
+                            m_fTimeSinceLastResponse = 0.0f;
+                            InvokeRepeating("HeartBeatSend", 0.0f, m_fHeartBeatMessageInterval); // start the HeartBeat message sends.
                             m_szMulticastIP = ConnAcceptedContent[0];
                             m_iMulticastPort = int.Parse(ConnAcceptedContent[1]);
                             m_iID = int.Parse(ConnAcceptedContent[2]);
@@ -283,6 +303,8 @@ public class CClient : MonoBehaviour
                             //the request is made is not multicast enabled, UdpClient will throw a SocketException.
                             Debug.LogWarning("A connection has been accepted. This client: " + m_szClientIP + " will join the multicast Group: " + m_szMulticastIP + " in port: " + m_iMulticastPort.ToString());
                             m_udpClient.JoinMulticastGroup(IPAddress.Parse(m_szMulticastIP)); //NOTE:: CHECK THAT THE PORT IS NOT NECESSARY?
+                            ClientInfo tmpThisClientInfo = new ClientInfo( m_iID, m_szClientIP);
+                            m_dicKnownClients.Add(m_szClientIP, tmpThisClientInfo);
                         }
                         Debug.Log("Exit Conn_Accepted case.");
                     }
@@ -298,14 +320,19 @@ public class CClient : MonoBehaviour
                         }
                         else
                         {
-                            ClientInfo tmpNewClient = new ClientInfo();
-                            tmpNewClient.m_iID = int.Parse(NewUserContent[0]);
-                            tmpNewClient.m_szIPAdress = NewUserContent[1];
+                            ClientInfo tmpNewClient = new ClientInfo( int.Parse(NewUserContent[0]) , NewUserContent[1]);
                             Debug.Log("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
                             m_dicKnownClients.Add(tmpNewClient.m_szIPAdress, tmpNewClient); //we add it to the Dictionary of known clients.
                             Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
                         Debug.Log("Exit New_User case.");
+                    }
+                    break;
+                case "HeartBeatACK":
+                    {
+                        Debug.Log("Entered HeartBeatACK case : This client's HeartBeat has been ACKNOWLEDGED.");
+                        m_fTimeSinceLastResponse = 0.0f;
+                        bDisconnected = false;
                     }
                     break;
 
@@ -326,10 +353,20 @@ public class CClient : MonoBehaviour
 
         //If a server has been chosen, return that ID, else, return this client's ID.
 
-        m_iServerID = m_iID;
+        m_iServerID = GetHighestID();
         //m_szServerIP = TODO.
-        return m_iID; //Default value.
+        return m_iServerID; //Default value.
     }
 
-    
+    private int GetHighestID()
+    {
+        int iHighest = 0;
+        foreach (KeyValuePair<string, ClientInfo> cinfo in m_dicKnownClients)
+        {
+            iHighest = iHighest < cinfo.Value.m_iID ? cinfo.Value.m_iID : iHighest; //If in one line to update the actual iHighest.
+        }
+
+        return iHighest;
+    }
+
 }

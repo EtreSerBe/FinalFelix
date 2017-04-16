@@ -69,6 +69,14 @@ public struct ClientInfo
     public String m_szIPAdress;
     public DateTime m_dtTimeSinceLastMessage; //used to decide if that client must be considered INACTIVE (or disconnected).
 
+    //Constructor which by defaults set the TimeSinceLastMessage value to DateTime.Now.
+    public ClientInfo( int in_iID, string in_szIPAddress )
+    {
+        m_iID = in_iID;
+        m_szIPAdress = in_szIPAddress;
+        m_dtTimeSinceLastMessage = DateTime.Now;
+    }
+
     public void SetTimeSinceLastMessage(DateTime in_Time)
     {
         m_dtTimeSinceLastMessage = in_Time;
@@ -166,12 +174,12 @@ public class CServer : MonoBehaviour
             iRand[2] = UnityEngine.Random.Range(0, 255);
             iRand[3] = UnityEngine.Random.Range(0, 255);
             m_szMulticastIP = iRand[0].ToString() + "." + iRand[1].ToString() + "." + iRand[2].ToString() + "." + iRand[3].ToString(); //new composed address.
-            m_iMulticastPort = UnityEngine.Random.Range(10000, 11000);//some range of possible ports.
+            m_iMulticastPort = 10000;// UnityEngine.Random.Range(10000, 11000);//some range of possible ports.
         }
         else //else, we adopt the previously stablished Address and port of the multicast group.
         {
             m_szMulticastIP = in_pClientRef.m_szMulticastIP;
-            m_iMulticastPort = in_pClientRef.m_iMulticastPort;
+            m_iMulticastPort = 10000;//NOTE: MUST BE THE SAME AS WHEN YOU BIND/CREATE THE SOCKETS// in_pClientRef.m_iMulticastPort;
         }
 
         Debug.LogWarning("The IP Address and port for the Multicast group are:  " + m_szMulticastIP + " : " + m_iMulticastPort.ToString());
@@ -202,7 +210,16 @@ public class CServer : MonoBehaviour
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
 
             Debug.Log("Processing message with contents: " + pActualMessage.ToString());
+
             
+            ClientInfo tmpInfo = new ClientInfo();
+            tmpInfo.m_iID = int.Parse(pActualMessage.m_szSenderID); //Serves as a casting to int.
+
+            tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
+
+            Debug.Log("That client's IP Address is : " + tmpInfo.m_szIPAdress);
+
+
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
             {
@@ -211,12 +228,6 @@ public class CServer : MonoBehaviour
                         //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
                         //the request is made is not multicast enabled, UdpClient will throw a SocketException.
                         Debug.Log("Entered Begin_Con case. A new client has requested to begin connection to this server.");
-                        ClientInfo tmpInfo = new ClientInfo();
-                        tmpInfo.m_iID = int.Parse( pActualMessage.m_szSenderID); //Serves as a casting to int.
-
-                        tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
-
-                        Debug.Log("That client's IP Address is : " + tmpInfo.m_szIPAdress);
 
                         //If it has not been registered as a connected client, then, add it to the list.
                         if (IsNewIPAddress(tmpInfo))
@@ -265,6 +276,20 @@ public class CServer : MonoBehaviour
                             Debug.Log("Someone who is already connected tried to connect. Its address is: " + tmpInfo.m_szIPAdress);
                         }
                         Debug.Log("Exit Begin_Con case in the server.");
+                    }
+                    break;
+                case "HeartBeat":
+                    {
+                        Debug.Log("Entered HeartBeat case on the server");
+                        if (IsNewIPAddress(tmpInfo))
+                        {
+                            Debug.LogError("Error, a new user is trying to send a HeartBeat message, it should Begin_Con first.");
+                        }
+                        else
+                        {
+                            m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Parse(m_szMulticastIP), 10000);//10000 port by default
+                        }
+                        Debug.Log("Exit HeartBeat case on the server");
                     }
                     break;
                 default:
