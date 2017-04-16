@@ -14,6 +14,8 @@ public class CClient : MonoBehaviour
     private float m_fTimeSinceLastResponse = 0.0f;  //This value must be reset when a response from the server is received.
     public float m_fMaxTimeSinceLastResponse = 5.0f;
     public bool m_bAutoReceiveMessages = true; //Deactivate this to stop this client from receiving its own messages.
+    public int m_iMaxMinutesSinceLastResponse = 0;
+    public int m_iMaxSecondsSinceLastResponse = 15;
 
     bool bDisconnected = false;//This value must be modified when a first response of the server/host is received.
     public int m_iID = 0; //ID value used to identify the clients from the Server's perspective.
@@ -23,7 +25,8 @@ public class CClient : MonoBehaviour
     public string m_szServerIP = "0.0.0.0";
 
     List<Message> m_MessagesList = new List<Message>();
-    HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
+    //HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
+    Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
 
     CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
@@ -75,6 +78,27 @@ public class CClient : MonoBehaviour
 
     }
 
+    public IEnumerator CheckTimeSinceLastMessageCoroutine(string in_szIPAddress)
+    {
+        yield return new WaitForSeconds(m_iMaxMinutesSinceLastResponse*60.0f + (float)m_iMaxSecondsSinceLastResponse);
+        //Now, we dow our checking.
+        ClientInfo OutClientInfo;
+        if (! m_dicKnownClients.TryGetValue(in_szIPAddress, out OutClientInfo))
+        {
+            Debug.LogWarning("Warning, checking the Timeout for a client which is not registered on the KnownClients Dictionary.");
+        }
+        
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
+        if (  (TimeDiff.Minutes == m_iMaxMinutesSinceLastResponse && TimeDiff.Seconds >= m_iMaxSecondsSinceLastResponse ) //if more
+            || TimeDiff.Minutes > m_iMaxMinutesSinceLastResponse)
+        {
+            //Then, this user is to be considered Inactive, and therefore removed from the group.
+            Debug.LogWarning("Warning, the user with IP: " + in_szIPAddress + " is INACTIVE and will be removed from the group.");
+            bool bRemovalSuccess = m_dicKnownClients.Remove(in_szIPAddress);
+            Debug.Log("The removal of the client was: " + bRemovalSuccess.ToString() );
+        }
+    }
+
     //CallBack, it's automatically called when the socket receives anything.
     private void recv(IAsyncResult res)
     {
@@ -99,6 +123,17 @@ public class CClient : MonoBehaviour
             //NOTE:::: CHECK IF A CLIENT SHOULD RECEIVE ITS OWN MESSAGES.
             if (pReceivedMessage.m_szSenderID != m_iID.ToString() || m_bAutoReceiveMessages)
             {
+                if (m_pServer != null) //check if this Node is the same one as the server, if it is, then it must check the timeouts.
+                {
+                    //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
+                    Debug.Log("Server is resseting the timeout for client with IP: " + pReceivedMessage.m_szTargetAddress);
+                    //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
+                    StopCoroutine(CheckTimeSinceLastMessageCoroutine(pReceivedMessage.m_szTargetAddress));
+                    m_dicKnownClients[pReceivedMessage.m_szTargetAddress].SetTimeSinceLastMessage( DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+                    //Then, we manage the times since this user last sent a message.
+                    StartCoroutine(CheckTimeSinceLastMessageCoroutine(pReceivedMessage.m_szTargetAddress));
+                }
+
                 //Now, store it on the message list buffer.
                 m_MessagesList.Add(pReceivedMessage);
                 Debug.Log("Now there are " + m_MessagesList.Count + " messages waiting to be processed.");
@@ -106,12 +141,6 @@ public class CClient : MonoBehaviour
                 m_fTimeSinceLastResponse = 0.0f;
             }
         }
-
-        //if (m_szClientIP == "0.0.0.0")
-        //{
-        //    m_szClientIP = ((IPEndPoint)m_udpClient.Client.LocalEndPoint).Address.ToString(); //only the IP, not the ":Port".
-        //    Debug.Log("m_szClientIP is: " + m_szClientIP);
-        //}
 
         //We need to begin receiving again, otherwise, it'd only receive once.
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
@@ -201,7 +230,7 @@ public class CClient : MonoBehaviour
                 //Start a server in this machine.
                 Debug.LogWarning("This machine will now host the server. Initializing.");
                 gameObject.AddComponent<CServer>(); //Add a CServer component to this gameObject, so a new Server starts. 
-                gameObject.GetComponent<CServer>().StartServer(this, m_setKnownClients); //Send this client's set of known clients to the new server.
+                gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
                 m_pServer = gameObject.GetComponent<CServer>();
                 SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast, 10000);
                 //bDisconnected = false; //JUST FOR TESTING.
@@ -273,8 +302,8 @@ public class CClient : MonoBehaviour
                             tmpNewClient.m_iID = int.Parse(NewUserContent[0]);
                             tmpNewClient.m_szIPAdress = NewUserContent[1];
                             Debug.Log("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
-                            m_setKnownClients.Add(tmpNewClient); //we add it to the set of known clients.
-                            Debug.Log("This client now knows: " + m_setKnownClients.Count + " Clients.");
+                            m_dicKnownClients.Add(tmpNewClient.m_szIPAdress, tmpNewClient); //we add it to the Dictionary of known clients.
+                            Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
                         Debug.Log("Exit New_User case.");
                     }

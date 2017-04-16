@@ -67,6 +67,12 @@ public struct ClientInfo
 {
     public int m_iID;
     public String m_szIPAdress;
+    public DateTime m_dtTimeSinceLastMessage; //used to decide if that client must be considered INACTIVE (or disconnected).
+
+    public void SetTimeSinceLastMessage(DateTime in_Time)
+    {
+        m_dtTimeSinceLastMessage = in_Time;
+    }
 
     public override int GetHashCode()
     {
@@ -95,7 +101,8 @@ public class CServer : MonoBehaviour
 	//ArrayList m_lstClients = new ArrayList();
     //Used to store information about the connected clients to this server.
     //List<ClientInfo> m_lstClientInfo = new List<ClientInfo>();
-    HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
+    //HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
+    Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
     public List<Message> m_MessagesList = new List<Message>();
 
     private int m_iCurrentID = 1;
@@ -109,9 +116,9 @@ public class CServer : MonoBehaviour
     private int GetHighestID()
     {
         int iHighest = 0;
-        foreach( ClientInfo cinfo in m_setClientInfo)
+        foreach( KeyValuePair<string,  ClientInfo> cinfo in m_dicKnownClients)
         {
-            iHighest = iHighest < cinfo.m_iID ? cinfo.m_iID : iHighest; //If in one line to update the actual iHighest.
+            iHighest = iHighest < cinfo.Value.m_iID ? cinfo.Value.m_iID : iHighest; //If in one line to update the actual iHighest.
         }
 
         return iHighest;
@@ -142,7 +149,7 @@ public class CServer : MonoBehaviour
 	}
 
     //Starts this component as the active server.
-    public void StartServer( CClient in_pClientRef,  HashSet<ClientInfo> in_refKnownClients)
+    public void StartServer( CClient in_pClientRef,  Dictionary<string , ClientInfo> in_refKnownClients)
     {
         Debug.Log("Entered StartServer function.");
         //m_udpServer.Client.ExclusiveAddressUse = false; //as it'll send and recieve.
@@ -168,10 +175,10 @@ public class CServer : MonoBehaviour
         }
 
         Debug.LogWarning("The IP Address and port for the Multicast group are:  " + m_szMulticastIP + " : " + m_iMulticastPort.ToString());
+        
+        m_dicKnownClients.Clear();//Clear it from any possible trash from other executions o something else.
 
-        m_setClientInfo.Clear();//Clear it from any possible trash from other executions o something else.
-
-        m_setClientInfo = new HashSet<ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
+        m_dicKnownClients = new Dictionary<string, ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
         m_iCurrentID = GetHighestID(); //The highest (lowest, in this case) ID given in the elements of "m_setClientInfo".
 
 
@@ -244,7 +251,7 @@ public class CServer : MonoBehaviour
 
                             //Add it to the Set of ClientsInfo.
                             //NOTE:::: Maybe it's not necessary anymore. 15 / april 2017
-                            m_setClientInfo.Add(tmpInfo);
+                            m_dicKnownClients.Add(tmpInfo.m_szIPAdress, tmpInfo);
 
                             //SEND TO EVERYONE ON THE GROUP.
                             /*********/
@@ -280,7 +287,7 @@ public class CServer : MonoBehaviour
 
     private bool IsNewIPAddress(ClientInfo in_AddressToCheck)
     {
-        if (m_setClientInfo.Contains(in_AddressToCheck))
+        if (m_dicKnownClients.ContainsKey(in_AddressToCheck.m_szIPAdress))
         {
             return false;
         }
