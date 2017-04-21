@@ -15,14 +15,15 @@ public struct Message
     public string m_szSenderID;                    //ID de quien lo envía
     public string m_szTargetAddress;               //IP de a quién va dirigido ?
     public string m_szMessageType;                 //tipo de mensaje (iniciar conexión, dejar conexión, update, etc.)
+    public string m_szDestinationAddress;          //IP Address to which the message is to be sent.
     public string m_szMessageContent;              //Contenido del mensaje
 
     public Message(byte[] in_receivedBytes)
     {
         string tmpString = Encoding.UTF8.GetString(in_receivedBytes);
         Debug.Log("Constructing a Message with: " + tmpString);
-        string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  5); //Gives us 5 parts so we can use each one as one of the variables of this object.
-        if ( tmpValuesArray.Length != 5 )
+        string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  6); //Gives us 5 parts so we can use each one as one of the variables of this object.
+        if ( tmpValuesArray.Length != 6 )
         {
             //Then, the received bytes did not have the correct format (which is, containing 4 tabs '\t' to addecuately make the split).
             Debug.LogError("A message was constructed without the correct information. it was:  " + tmpString);
@@ -30,6 +31,7 @@ public struct Message
             m_szSenderID = null;
             m_szTargetAddress = null;
             m_szMessageType = null;
+            m_szDestinationAddress = null;
             m_szMessageContent = null;
             return; //return to exit the constructor.
         }
@@ -39,17 +41,19 @@ public struct Message
         m_szSenderID = tmpValuesArray[1];
         m_szTargetAddress = tmpValuesArray[2];
         m_szMessageType = tmpValuesArray[3];
-        m_szMessageContent = tmpValuesArray[4];
+        m_szDestinationAddress = tmpValuesArray[4];
+        m_szMessageContent = tmpValuesArray[5];
 
         Debug.Log("A message was created, and it has the values: " + ToString());//Debug to see what does it say.
     }
 
-    public Message(char in_isForServer, string in_szSenderID, string in_szTargetIPAddress, string in_szTypeOfMessage, string in_szMessageContent)
+    public Message(char in_isForServer, string in_szSenderID, string in_szTargetIPAddress, string in_szTypeOfMessage, string in_szDestinationAddress, string in_szMessageContent)
     {
         m_cIsForServer = in_isForServer; //By convention, this is where we will store this information.
         m_szSenderID = in_szSenderID;
         m_szTargetAddress = in_szTargetIPAddress;
         m_szMessageType = in_szTypeOfMessage;
+        m_szDestinationAddress = in_szDestinationAddress;
         m_szMessageContent = in_szMessageContent;
     }
 
@@ -57,7 +61,7 @@ public struct Message
     public override string ToString()
     {
         string tmpString;
-        tmpString = m_cIsForServer.ToString() + '\t' + m_szSenderID + '\t' + m_szTargetAddress + '\t' + m_szMessageType + '\t' + m_szMessageContent;
+        tmpString = m_cIsForServer.ToString() + '\t' + m_szSenderID + '\t' + m_szTargetAddress + '\t' + m_szMessageType + '\t' + m_szDestinationAddress + '\t' + m_szMessageContent;
         return tmpString;
     }
 
@@ -88,6 +92,12 @@ public struct ClientTimers
     public DateTime m_dtTimeSinceLastMessage; //used to decide if that client must be considered INACTIVE.
     public DateTime m_dtTimeSinceLastHeartBeat; //used to decide if that client must be considered DISCONNECTED.
 
+    public ClientTimers( bool bTrue = true )
+    {
+        m_dtTimeSinceLastMessage = DateTime.Now;
+        m_dtTimeSinceLastHeartBeat = DateTime.Now;
+    }
+
     public void SetTimeSinceLastMessage(DateTime in_Time)
     {
         m_dtTimeSinceLastMessage = in_Time;
@@ -110,9 +120,8 @@ public class CServer : MonoBehaviour
 
     //Socket  m_Socket,
     //		m_SocketTick;
-
     //Supposedly, this one will no longer be necessary.
-    UdpClient m_udpServer;
+    //UdpClient m_udpServer;
 
     public CClient m_pClientRef = null;
 
@@ -318,12 +327,12 @@ public class CServer : MonoBehaviour
 
                                 //Send the IP of the multicast group to the new client, so it can join. Also, its new ID for inside the group.
                                 //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
-                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_szClientIP,  pActualMessage.m_szTargetAddress, "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
-                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ IPAddress.Parse(pActualMessage.m_szTargetAddress), 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
+                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_iID.ToString(),  pActualMessage.m_szTargetAddress, "Conn_Accepted", m_pClientRef.m_szClientIP, (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
+                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ pActualMessage.m_szTargetAddress, 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
-                                m_pClientRef.SendUDPMessage('N', "New_User", tmpInfo.m_iID.ToString() + "\t" + pActualMessage.m_szTargetAddress, IPAddress.Parse(m_szMulticastIP), m_iMulticastPort); //send it to the multicast group.
+                                m_pClientRef.SendUDPMessage('N', "New_User", tmpInfo.m_iID.ToString() + "\t" + pActualMessage.m_szTargetAddress, m_szMulticastIP, m_iMulticastPort); //send it to the multicast group.
 
                             }
                             else // else, it means that the client had an ID assigned by the previous server, but this machine didn't know about it. 
@@ -341,6 +350,7 @@ public class CServer : MonoBehaviour
                             //NOTE:::: Maybe it's not necessary anymore. 15 / april 2017
                             //NOTE:::: WE NEED TO SEND THE WHOLE INFO TO THE NEW CLIENT! 16/4/2017
                             m_dicKnownClients.Add(tmpInfo.m_szIPAdress, tmpInfo);
+                            m_dicClientTimers.Add(tmpInfo.m_szIPAdress, new ClientTimers());
 
                             //SEND TO EVERYONE ON THE GROUP.
                             /*********/
@@ -366,7 +376,7 @@ public class CServer : MonoBehaviour
                         else
                         {
                             UpdateLastHeartBeatFromAddress(tmpInfo.m_szIPAdress);//Update the time since we received the last Heartbeat from this address.
-                            m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , IPAddress.Parse(tmpInfo.m_szIPAdress) /*IPAddress.Parse(m_szMulticastIP)*/, 10000);//10000 port by default
+                            m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , tmpInfo.m_szIPAdress /*IPAddress.Parse(m_szMulticastIP)*/, 10000);//10000 port by default
                         }
                         Debug.Log("Exit HeartBeat case on the server");
                     }

@@ -65,7 +65,7 @@ public class CClient : MonoBehaviour
             Debug.Log("Beggining to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
           
-            SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast, 10000);
+            SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast.ToString(), 10000);
            
         }
         catch (Exception e)
@@ -92,7 +92,8 @@ public class CClient : MonoBehaviour
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
         Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
         Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
-        if ((string)res.AsyncState == IPAddress.Broadcast.ToString())
+        Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
+        if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
         {
             //Then it is from a new user.
             if (m_pServer != null)
@@ -105,7 +106,7 @@ public class CClient : MonoBehaviour
             }
             //Otherwise, we just ignore it.
         }
-        else if ((string)res.AsyncState == m_szClientIP)
+        else if (pReceivedMessage.m_szDestinationAddress == m_szClientIP)
         {
             //Then, it was specifically to this IP.
             Debug.Log("A message to this SPECIFIC ADDRESS -" + m_szClientIP + " was received, its contents are: " + pReceivedMessage.ToString());
@@ -126,7 +127,7 @@ public class CClient : MonoBehaviour
                 m_MessagesList.Add(pReceivedMessage);
             }
         }
-        else if ((string)res.AsyncState == m_szMulticastIP)
+        else if (pReceivedMessage.m_szDestinationAddress == m_szMulticastIP)
         {
             //Then, it was sent to the multicast group.
             Debug.Log("MULTICAST message received, adding it to its message list.");
@@ -139,7 +140,7 @@ public class CClient : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("This Client: " + m_szClientIP + " received a message without an specific PURPOSE. Beware of suspicious.");
+            Debug.LogWarning("This Client: " + m_szClientIP + " received a message without an specific PURPOSE. Beware of suspicious. The Destination address was: " + pReceivedMessage.m_szDestinationAddress);
         }
 
 
@@ -170,45 +171,46 @@ public class CClient : MonoBehaviour
 
 
     //I still have my doubts about this one, maybe it should have other parameters as well.
-    public void SendUDPMessage(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent, IPAddress in_Address, int in_iPort  )
+    public void SendUDPMessage(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent, string in_szAddress, int in_iPort  )
     {
-        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szMessageContent);
+        
+        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szAddress, in_szMessageContent);
 
         byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
 
-        Debug.Log("Sending a message to Endpoint: " + in_Address.ToString() + " and port: " + in_iPort + " from IP: " + m_szClientIP );
+        Debug.Log("Sending a message to Endpoint: " + in_szAddress + " and port: " + in_iPort + " from IP: " + m_szClientIP );
         //Send a message to the server.
         
-        IPEndPoint RemoteIpEndPoint = new IPEndPoint(in_Address, in_iPort);
-        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, in_Address.ToString());//Do the broadcast.
+        IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(in_szAddress), in_iPort);
+        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the broadcast.
        
     }
 
 
 
     //facility to be a little more organized.
-    public void SendUDPMessage(Message in_pMessage, IPAddress in_Address, int in_iPort)
+    public void SendUDPMessage(Message in_pMessage, string in_szAddress, int in_iPort)
     {
-        SendUDPMessage(in_pMessage.m_cIsForServer, in_pMessage.m_szMessageType, in_pMessage.m_szMessageContent, in_Address, in_iPort);
+        SendUDPMessage(in_pMessage.m_cIsForServer, in_pMessage.m_szMessageType, in_pMessage.m_szMessageContent, in_szAddress, in_iPort);
     }
 
     //This one uses the defined Multicast Address and port to send, so it's less tedious to use.
     public void SendUDPMessageToGroup(char in_isForServer, string in_szTypeOfMessage, string in_szMessageContent )
     {
-        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szMessageContent);
+        Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, m_szMulticastIP, in_szMessageContent);
 
         byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
 
         Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort + " from IP: " + m_szClientIP);
         //Send a message to the server.
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse( m_szMulticastIP), m_iMulticastPort);
-        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, m_szMulticastIP);//Do the multicast.
+        m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the multicast.
     }
 
     void HeartBeatSend()
     {
         Debug.Log("Sending HeartBeat message to Server. This is invoked repeatedly.");
-        SendUDPMessage('Y', "HeartBeat", "Empty", IPAddress.Parse(m_szServerIP) , 10000); //NOTE:: THIS WOULD BE BETTER IF ONLY SENT TO SERVER.
+        SendUDPMessage('Y', "HeartBeat", "Empty", m_szServerIP , 10000); //NOTE:: THIS WOULD BE BETTER IF ONLY SENT TO SERVER.
     }
 
     // Update is called once per frame
@@ -241,7 +243,7 @@ public class CClient : MonoBehaviour
                 m_szServerIP = m_szClientIP; //Make the IP of the server the same as this client's IP.
                 gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
                 m_pServer = gameObject.GetComponent<CServer>();
-                SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast, 10000);
+                SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast.ToString(), 10000);
                 //bDisconnected = false; //JUST FOR TESTING.
             }
             else
