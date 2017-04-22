@@ -216,9 +216,13 @@ public class CServer : MonoBehaviour
         //Debug.Log("Server is resseting the INACTIVITY timeout for client with IP: " + in_szAddress);
         //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
         StopCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
-        m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
-          //Then, we manage the times since this user last sent a message.
-        StartCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
+        if (m_dicClientTimers.ContainsKey(in_szAddress))
+        {
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+            //Then, we manage the times since this user last sent a message.
+            StartCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
+        }
+        //else, do nothing and allow the coroutine to continue stopped.
     }
 
     public void UpdateLastHeartBeatFromAddress(string in_szAddress)
@@ -227,9 +231,13 @@ public class CServer : MonoBehaviour
         //Debug.Log("Server is resseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
         //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
         StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
-        m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
-        //Then, we manage the times since this user last sent a message.
-        StartCoroutine(CheckHeartBeatCoroutine(in_szAddress));
+        if (m_dicClientTimers.ContainsKey(in_szAddress))
+        {
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+            //Then, we manage the times since this user last sent a message.
+            StartCoroutine(CheckHeartBeatCoroutine(in_szAddress));
+        }
+        //else, do nothing and allow the coroutine to continue stopped.
     }
 
     //Starts this component as the active server.
@@ -270,11 +278,11 @@ public class CServer : MonoBehaviour
 
     private void ProcessMessages()
     {
-        if (m_MessagesList.Count != 0)
+        /*if (m_MessagesList.Count != 0)
         {
             Debug.LogWarning("There are: " + m_MessagesList.Count + " messages waiting to be processed in the SERVER.");
             Debug.LogWarning("This SERVER knows: " + m_dicKnownClients.Count + " clients at this time.");
-        }
+        }*/
 
         while (m_MessagesList.Count != 0)
         {
@@ -367,7 +375,7 @@ public class CServer : MonoBehaviour
                     break;
                 case "User_Quit":
                     {
-                        Debug.LogWarning("Entered User_Quit case on the Server.");
+                        Debug.LogWarning("Entered User_Quit case on the SERVER.");
                         if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
                         {
                             Debug.LogWarning("A user has Quit the application, notifying the other users about it. OR MAYBE IT SHOULD NOTIFY THEM ITSELF.");
@@ -375,7 +383,7 @@ public class CServer : MonoBehaviour
                             m_dicClientTimers.Remove(pActualMessage.m_szTargetAddress);
 
                         }
-                        Debug.LogWarning("Exit User_Quit case on the client.");
+                        Debug.LogWarning("Exit User_Quit case on the SERVER.");
                     }
                     break;
                 default:

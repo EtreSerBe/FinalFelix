@@ -78,16 +78,24 @@ public class CClient : MonoBehaviour
     {
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
         Debug.LogWarning("Quitting application, notifying the Server, so he notifies everyone else. Notifing the server: " + m_szServerIP);
-        //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
-        Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
-        byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
-        m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
+        if (m_szServerIP != "0.0.0.0")
+        {
+            //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
+            Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
+            byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+            m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
 
-        //Now to the multicast group synchronously.
-        Message NewGroupMessage = new Message('N', m_iID.ToString(), m_szClientIP, "User_Quit", m_szMulticastIP, "Empty");
-        byte[] msgBytesGroup = Encoding.UTF8.GetBytes(NewGroupMessage.ToString());
-        m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
-        //SendUDPMessageToGroup('N', "User_Quit", "Empty");
+            //Now to the multicast group synchronously.
+            Message NewGroupMessage = new Message('N', m_iID.ToString(), m_szClientIP, "User_Quit", m_szMulticastIP, "Empty");
+            byte[] msgBytesGroup = Encoding.UTF8.GetBytes(NewGroupMessage.ToString());
+            m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
+            //SendUDPMessageToGroup('N', "User_Quit", "Empty");
+        }
+        else
+        {
+            Debug.LogWarning("This client knew no IPAddress for a server, so it will send nothing.");
+        }
+
         m_udpClient.Close(); // this might need a super flag or something to avoid doing anything else when this is activated.
     }
 
@@ -95,8 +103,7 @@ public class CClient : MonoBehaviour
     private void recv(IAsyncResult res)
     {
         //Debug.Log("Entered recv function, Callback for the BeginReceive function.");
-        //Also, reset the time since the last message was received.
-        m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
+       
 
         IPEndPoint RemoteIpEndPoint;
         //Receive messages especifically sent to this client's IP by the server.
@@ -108,6 +115,7 @@ public class CClient : MonoBehaviour
         //Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
         if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
         {
+            Debug.LogWarning("Message to BROADCAST received from: " + pReceivedMessage.m_szTargetAddress);
             //Then it is from a new user.
             if (m_pServer != null)
             {
@@ -121,6 +129,8 @@ public class CClient : MonoBehaviour
         }
         else if (pReceivedMessage.m_szDestinationAddress == m_szClientIP)
         {
+            //Also, reset the time since the last message was received.
+            m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
             //Then, it was specifically to this IP.
             Debug.Log("A message to this SPECIFIC ADDRESS -" + m_szClientIP + " was received, its contents are: " + pReceivedMessage.ToString());
             if (pReceivedMessage.m_cIsForServer == 'Y')
@@ -142,6 +152,8 @@ public class CClient : MonoBehaviour
         }
         else if (pReceivedMessage.m_szDestinationAddress == m_szMulticastIP)
         {
+            //Also, reset the time since the last message was received.
+            m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
             //Then, it was sent to the multicast group.
             Debug.Log("MULTICAST message received, adding it to its message list.");
             m_MessagesList.Add(pReceivedMessage);
@@ -255,11 +267,11 @@ public class CClient : MonoBehaviour
     //
     void ProcessMessage()
     {
-        if (m_MessagesList.Count != 0)
+        /*if (m_MessagesList.Count != 0)
         {
             Debug.LogWarning("There are: " + m_MessagesList.Count + " messages waiting to be processed in the client.");
             Debug.LogWarning("This client knows: " + m_dicKnownClients.Count + " clients at this time.");
-        }
+        }*/
 
         //First, check if it is a recent message, or if you can have a 
         //Check if the message belongs to you or the server.
