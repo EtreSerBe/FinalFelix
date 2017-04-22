@@ -12,7 +12,7 @@ public class CClient : MonoBehaviour
 
     UdpClient m_udpClient;
     private float m_fTimeSinceLastResponse = 0.0f;  //This value must be reset when a response from the server is received.
-    public float m_fMaxTimeSinceLastResponse = 5.0f;
+    public float m_fMaxTimeSinceLastResponse = 15.0f;
     public bool m_bAutoReceiveMessages = true; //Deactivate this to stop this client from receiving its own messages.
     public int m_iMaxMinutesSinceLastResponse = 0; //NOTE: This values fro last response are used in the CServer class. Preferably, they'll be moved to globals.
     public int m_iMaxSecondsSinceLastResponse = 15;
@@ -20,6 +20,7 @@ public class CClient : MonoBehaviour
     public string m_szPseudoBroadcastAddress = "223.0.0.0"; //some random value.
 
     bool bDisconnected = false;//This value must be modified when a first response of the server/host is received.
+    //bool m_bConnectionStablished = false;
     public int m_iID = 0; //ID value used to identify the clients from the Server's perspective.
     public string m_szClientIP = "0.0.0.0";
     public int m_iServerID = -2;
@@ -165,7 +166,8 @@ public class CClient : MonoBehaviour
     private void sendCallback(IAsyncResult res)
     {
         //Debug.Log("Entered sendCallback function, Callback for the BeginSend function.");
-        Debug.Log("Number of bytes sent by: " + m_szClientIP +  " were: " + m_udpClient.EndSend(res));//The call to "m_udpClient.EndSend(res)" is indispensable!
+        m_udpClient.EndSend(res);
+        //Debug.Log("Number of bytes sent by: " + m_szClientIP +  " were: " + m_udpClient.EndSend(res));//The call to "m_udpClient.EndSend(res)" is indispensable!
         //Debug.Log("Exit sendCallback function, Callback for the BeginSend function.");
     }
 
@@ -212,7 +214,7 @@ public class CClient : MonoBehaviour
         //If it has, process it.
         m_fTimeSinceLastResponse += Time.deltaTime;
 
-        if (m_fTimeSinceLastResponse >= m_fMaxTimeSinceLastResponse && bDisconnected == false)
+        if (m_fTimeSinceLastResponse >= m_fMaxTimeSinceLastResponse && bDisconnected == false )
         {
             bDisconnected = true;
             //Now, we intend to disconnect, and try to select a new leader.
@@ -242,6 +244,7 @@ public class CClient : MonoBehaviour
                 //Wait some time and then try to connect to the new leader.
                 Debug.LogWarning("Another machine will host the server, it's ID is: " + m_szServerIP);
                 //NOTE::: MAKE THE M_SZsERVERIP equal to the IP of the new server machine.
+                bDisconnected = false; //??
             }
         }
         else

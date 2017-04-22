@@ -21,7 +21,7 @@ public struct Message
     public Message(byte[] in_receivedBytes)
     {
         string tmpString = Encoding.UTF8.GetString(in_receivedBytes);
-        Debug.Log("Constructing a Message with: " + tmpString);
+        //Debug.Log("Constructing a Message with: " + tmpString);
         string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  6); //Gives us 5 parts so we can use each one as one of the variables of this object.
         if ( tmpValuesArray.Length != 6 )
         {
@@ -44,7 +44,7 @@ public struct Message
         m_szDestinationAddress = tmpValuesArray[4];
         m_szMessageContent = tmpValuesArray[5];
 
-        Debug.Log("A message was created, and it has the values: " + ToString());//Debug to see what does it say.
+        //Debug.Log("A message was created, and it has the values: " + ToString());//Debug to see what does it say.
     }
 
     public Message(char in_isForServer, string in_szSenderID, string in_szTargetIPAddress, string in_szTypeOfMessage, string in_szDestinationAddress, string in_szMessageContent)
