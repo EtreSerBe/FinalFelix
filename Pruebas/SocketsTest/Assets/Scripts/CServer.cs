@@ -213,7 +213,7 @@ public class CServer : MonoBehaviour
     public void UpdateLastMessageFromAddress(string in_szAddress)
     {
         //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
-        Debug.Log("Server is resseting the INACTIVITY timeout for client with IP: " + in_szAddress);
+        //Debug.Log("Server is resseting the INACTIVITY timeout for client with IP: " + in_szAddress);
         //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
         StopCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
         m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
@@ -224,7 +224,7 @@ public class CServer : MonoBehaviour
     public void UpdateLastHeartBeatFromAddress(string in_szAddress)
     {
         //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
-        Debug.Log("Server is resseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
+        //Debug.Log("Server is resseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
         //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
         StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
@@ -281,7 +281,7 @@ public class CServer : MonoBehaviour
             tmpInfo.m_iID = int.Parse(pActualMessage.m_szSenderID); //Serves as a casting to int.
             tmpInfo.m_szIPAdress = pActualMessage.m_szTargetAddress;  //The position of the bytes corresponding to the IP Address.
 
-            Debug.Log("SERVER SAYS: That client's IP Address is : " + tmpInfo.m_szIPAdress);
+            //Debug.Log("SERVER SAYS: That client's IP Address is : " + tmpInfo.m_szIPAdress);
 
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
@@ -290,7 +290,7 @@ public class CServer : MonoBehaviour
                     {
                         //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
                         //the request is made is not multicast enabled, UdpClient will throw a SocketException.
-                        Debug.Log("Entered Begin_Con case. A new client has requested to begin connection to this server.");
+                        Debug.LogWarning("Entered Begin_Con case. A new client has requested to begin connection to this server.");
 
                         //If it has not been registered as a connected client, then, add it to the list.
                         if (IsNewIPAddress(tmpInfo))
@@ -304,14 +304,15 @@ public class CServer : MonoBehaviour
 
                                 //Send the IP of the multicast group to the new client, so it can join. Also, its new ID for inside the group.
                                 //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
-                                Message MulticastAddressMsg = new Message('N', m_pClientRef.m_iID.ToString(),  pActualMessage.m_szTargetAddress, "Conn_Accepted", m_pClientRef.m_szClientIP, (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
-                                m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ pActualMessage.m_szTargetAddress, 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
+                                //Message MulticastAddressMsg = new Message('N', m_pClientRef.m_iID.ToString(),  pActualMessage.m_szTargetAddress, "Conn_Accepted", m_pClientRef.m_szClientIP, (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
+                                //m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ pActualMessage.m_szTargetAddress, 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
+                                m_pClientRef.SendUDPMessage('N', "Conn_Accepted", (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP), tmpInfo.m_szIPAdress, 10000);
                                 //Also, send all the info about the other clients to this one.
-                                SendKnownClientsDic(pActualMessage.m_szTargetAddress);
+                                SendKnownClientsDic(tmpInfo.m_szIPAdress);
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
-                                m_pClientRef.SendUDPMessage('N', "New_User", tmpInfo.m_iID.ToString() + "\t" + pActualMessage.m_szTargetAddress, m_szMulticastIP, m_iMulticastPort); //send it to the multicast group.
+                                m_pClientRef.SendUDPMessage('N', "New_User", tmpInfo.m_iID.ToString() + "\t" + tmpInfo.m_szIPAdress, m_szMulticastIP, m_iMulticastPort); //send it to the multicast group.
 
                             }
                             else // else, it means that the client had an ID assigned by the previous server, but this machine didn't know about it. 
@@ -341,12 +342,12 @@ public class CServer : MonoBehaviour
                         {
                             Debug.Log("Someone who is already connected tried to connect. Its address is: " + tmpInfo.m_szIPAdress);
                         }
-                        Debug.Log("Exit Begin_Con case in the server.");
+                        Debug.LogWarning("Exit Begin_Con case in the server.");
                     }
                     break;
                 case "HeartBeat":
                     {
-                        Debug.Log("Entered HeartBeat case on the server");
+                        //Debug.Log("Entered HeartBeat case on the server");
                         if (IsNewIPAddress(tmpInfo))
                         {
                             Debug.LogError("Error, a new user is trying to send a HeartBeat message, it should Begin_Con first.");
@@ -356,12 +357,12 @@ public class CServer : MonoBehaviour
                             UpdateLastHeartBeatFromAddress(tmpInfo.m_szIPAdress);//Update the time since we received the last Heartbeat from this address.
                             m_pClientRef.SendUDPMessage('N', "HeartBeatACK", "OK" , tmpInfo.m_szIPAdress /*IPAddress.Parse(m_szMulticastIP)*/, 10000);//10000 port by default
                         }
-                        Debug.Log("Exit HeartBeat case on the server");
+                        //Debug.Log("Exit HeartBeat case on the server");
                     }
                     break;
                 case "User_Quit":
                     {
-                        Debug.Log("Entered User_Quit case on the Server.");
+                        Debug.LogWarning("Entered User_Quit case on the Server.");
                         if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
                         {
                             Debug.LogWarning("A user has Quit the application, notifying the other users about it. OR MAYBE IT SHOULD NOTIFY THEM ITSELF.");
@@ -369,7 +370,7 @@ public class CServer : MonoBehaviour
                             m_dicClientTimers.Remove(pActualMessage.m_szTargetAddress);
 
                         }
-                        Debug.Log("Exit User_Quit case on the client.");
+                        Debug.LogWarning("Exit User_Quit case on the client.");
                     }
                     break;
                 default:

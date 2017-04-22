@@ -101,7 +101,7 @@ public class CClient : MonoBehaviour
         //Receive messages especifically sent to this client's IP by the server.
         RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0); //WARNING :::::::::: SHOULD THIS BE "ANY" OR SHOULD WE JUST RECEIVE FROM SERVER AND MULTICAST GROUP?
         byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
-        m_udpClient.BeginReceive(new AsyncCallback(recv), null);
+        
         Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
         Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
         //Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
@@ -154,6 +154,8 @@ public class CClient : MonoBehaviour
         {
             Debug.LogWarning("This Client: " + m_szClientIP + " received a message without an specific PURPOSE. Beware of suspicious. The Destination address was: " + pReceivedMessage.m_szDestinationAddress);
         }
+        //Finally, begin receiving again.
+        m_udpClient.BeginReceive(new AsyncCallback(recv), null);
     }
 
     //This one is used to differentiate between messages to the server and messages received by someone who is trying to access the service.
@@ -340,7 +342,7 @@ public class CClient : MonoBehaviour
                     break;
                 case "User_Disconnect":
                     {
-                        Debug.Log("Entered User_Disconnect case.");
+                        Debug.LogWarning("Entered User_Disconnect case.");
                         //1- IP address to disconnect. 2- Reason for disconnection.
                         string [] szMessageContent = pActualMessage.m_szMessageContent.Split('\t');
                         if (szMessageContent.Length != 2) // see that there must be 3 parameters in the content of this message.
@@ -360,7 +362,7 @@ public class CClient : MonoBehaviour
                             }
                             Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
-                        Debug.Log("Exit User_Disconnect case.");
+                        Debug.LogWarning("Exit User_Disconnect case.");
                     }
                     break;
                 case "Known_User":
@@ -389,14 +391,14 @@ public class CClient : MonoBehaviour
                     break;
                 case "User_Quit":
                     {
-                        Debug.Log("Entered User_Quit case on the client.");
+                        Debug.LogWarning("Entered User_Quit case on the client.");
                         if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
                         {
                             //Maybe show an IN-GAME notification about this would be good.
                             Debug.LogWarning("A user has Quit the application. Removing it from the known clients. Its IP was: " + pActualMessage.m_szTargetAddress);
                             m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
                         }
-                        Debug.Log("Exit User_Quit case on the client.");
+                        Debug.LogWarning("Exit User_Quit case on the client.");
                     }
                     break;
 
