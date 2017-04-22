@@ -30,6 +30,8 @@ public class CClient : MonoBehaviour
     List<Message> m_MessagesList = new List<Message>();
     //HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
     Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
+    DateTime m_dtBeginDateTime ;
+    //Dictionary<string, int> m_dicPreServerKnownClients = new Dictionary<string, int>();
 
     CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
@@ -64,8 +66,8 @@ public class CClient : MonoBehaviour
             m_fTimeSinceLastResponse = 0.0f;
             Debug.Log("Beggining to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
-          
-            SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast.ToString(), 10000);
+            m_dtBeginDateTime = DateTime.UtcNow;
+            SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
         }
         catch (Exception e)
         {
@@ -126,6 +128,17 @@ public class CClient : MonoBehaviour
                     Debug.LogError("Error, a Broadcast message was received, but it was not Sent to the Server!");
             }
             //Otherwise, we just ignore it.
+            else
+            {
+                DateTime tmpReceivedDate = DateTime.Parse(pReceivedMessage.m_szMessageContent);
+                if ( tmpReceivedDate.CompareTo(m_dtBeginDateTime) < 0) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
+                {
+                    //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
+                    Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
+                    m_fTimeSinceLastResponse = 0.0f;
+                }
+                //else //so, this client can continue its execution normally, the other one must be the one to wait N seconds longer.
+            }
         }
         else if (pReceivedMessage.m_szDestinationAddress == m_szClientIP)
         {
@@ -246,7 +259,7 @@ public class CClient : MonoBehaviour
                 m_szServerIP = m_szClientIP; //Make the IP of the server the same as this client's IP.
                 gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
                 m_pServer = gameObject.GetComponent<CServer>();
-                SendUDPMessage('Y', "Begin_Con", "Empty", IPAddress.Broadcast.ToString(), 10000);
+                SendUDPMessage('Y', "Begin_Con", DateTime.UtcNow.ToString(), IPAddress.Broadcast.ToString(), 10000);
                 //bDisconnected = false; //JUST FOR TESTING.
             }
             else
