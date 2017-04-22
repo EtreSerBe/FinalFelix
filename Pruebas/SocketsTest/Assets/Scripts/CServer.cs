@@ -359,6 +359,17 @@ public class CServer : MonoBehaviour
                         Debug.Log("Exit HeartBeat case on the server");
                     }
                     break;
+                case "User_Quit":
+                    {
+                        if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
+                        {
+                            Debug.LogWarning("A user has Quit the application, notifying the other users about it. OR MAYBE IT SHOULD NOTIFY THEM ITSELF.");
+                            m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
+                            m_dicClientTimers.Remove(pActualMessage.m_szTargetAddress);
+
+                        }
+                    }
+                    break;
                 default:
                     {
                         Debug.LogError("ERROR: The server received a pActualMessage.m_szMessageType with value: " + pActualMessage.m_szMessageType);
@@ -378,7 +389,7 @@ public class CServer : MonoBehaviour
         Debug.Log("Sending the info about known clients to the address: " + in_szAddress);
         foreach ( KeyValuePair<string , ClientInfo> cl in m_dicKnownClients )
         {
-            m_pClientRef.SendUDPMessage('N', "Known_User", cl.Value.m_iID + '\t' + cl.Value.m_szIPAdress, in_szAddress, 10000);
+            m_pClientRef.SendUDPMessage('N', "Known_User", cl.Value.m_iID.ToString() + '\t' + cl.Value.m_szIPAdress, in_szAddress, 10000);
         }
     }
 

@@ -79,6 +79,7 @@ public class CClient : MonoBehaviour
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
         Debug.Log("Quitting application, notifying the Server, so he notifies everyone else.");
         SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
+        SendUDPMessageToGroup('N', "User_Quit", "Empty");
     }
 
     //CallBack, it's automatically called when the socket receives anything.
@@ -90,7 +91,7 @@ public class CClient : MonoBehaviour
 
         IPEndPoint RemoteIpEndPoint;
         //Receive messages especifically sent to this client's IP by the server.
-        RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000); //WARNING :::::::::: SHOULD THIS BE "ANY" OR SHOULD WE JUST RECEIVE FROM SERVER AND MULTICAST GROUP?
+        RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0); //WARNING :::::::::: SHOULD THIS BE "ANY" OR SHOULD WE JUST RECEIVE FROM SERVER AND MULTICAST GROUP?
         byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
         Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
@@ -245,6 +246,7 @@ public class CClient : MonoBehaviour
                 Debug.LogWarning("Another machine will host the server, it's ID is: " + m_szServerIP);
                 //NOTE::: MAKE THE M_SZsERVERIP equal to the IP of the new server machine.
                 bDisconnected = false; //??
+                m_fTimeSinceLastResponse = 0.0f; // so it doesn't try many times while waiting for the other user to become the server.
             }
         }
         else
@@ -375,7 +377,16 @@ public class CClient : MonoBehaviour
                         Debug.Log("Exit Known_User case.");
                     }
                     break;
-
+                case "User_Quit":
+                    {
+                        if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
+                        {
+                            //Maybe show an IN-GAME notification about this would be good.
+                            Debug.LogWarning("A user has Quit the application. Removing it from the known clients. Its IP was: " + pActualMessage.m_szTargetAddress);
+                            m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
+                        }
+                    }
+                    break;
 
             }
 
