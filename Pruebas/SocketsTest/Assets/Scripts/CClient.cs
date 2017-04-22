@@ -85,7 +85,7 @@ public class CClient : MonoBehaviour
     //CallBack, it's automatically called when the socket receives anything.
     private void recv(IAsyncResult res)
     {
-        Debug.Log("Entered recv function, Callback for the BeginReceive function.");
+        //Debug.Log("Entered recv function, Callback for the BeginReceive function.");
         //Also, reset the time since the last message was received.
         m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
 
@@ -96,7 +96,7 @@ public class CClient : MonoBehaviour
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
         Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
         Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
-        Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
+        //Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
         if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
         {
             //Then it is from a new user.
@@ -158,7 +158,7 @@ public class CClient : MonoBehaviour
         {
             //Then, it means it is destined for the server part, not the client. And the server ir running on this machine.
             m_pServer.m_MessagesList.Add(in_pDispatchMessage);
-            Debug.Log("The message just got passed to the SERVER, not to this client. Its content is: " + in_pDispatchMessage.ToString());
+            //Debug.Log("The message just got passed to the SERVER, not to this client. Its content is: " + in_pDispatchMessage.ToString());
             return true;
         }
         return false;
@@ -204,7 +204,7 @@ public class CClient : MonoBehaviour
 
     void HeartBeatSend()
     {
-        Debug.Log("Sending HeartBeat message to Server. This is invoked repeatedly.");
+        //Debug.Log("Sending HeartBeat message to Server. This is invoked repeatedly.");
         SendUDPMessage('Y', "HeartBeat", "Empty", m_szServerIP , 10000); //NOTE:: THIS WOULD BE BETTER IF ONLY SENT TO SERVER.
     }
 
@@ -379,12 +379,14 @@ public class CClient : MonoBehaviour
                     break;
                 case "User_Quit":
                     {
+                        Debug.Log("Entered User_Quit case on the client.");
                         if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
                         {
                             //Maybe show an IN-GAME notification about this would be good.
                             Debug.LogWarning("A user has Quit the application. Removing it from the known clients. Its IP was: " + pActualMessage.m_szTargetAddress);
                             m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
                         }
+                        Debug.Log("Exit User_Quit case on the client.");
                     }
                     break;
 

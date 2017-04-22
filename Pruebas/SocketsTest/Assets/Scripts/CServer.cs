@@ -361,6 +361,7 @@ public class CServer : MonoBehaviour
                     break;
                 case "User_Quit":
                     {
+                        Debug.Log("Entered User_Quit case on the Server.");
                         if (m_dicKnownClients.ContainsKey(pActualMessage.m_szTargetAddress))
                         {
                             Debug.LogWarning("A user has Quit the application, notifying the other users about it. OR MAYBE IT SHOULD NOTIFY THEM ITSELF.");
@@ -368,6 +369,7 @@ public class CServer : MonoBehaviour
                             m_dicClientTimers.Remove(pActualMessage.m_szTargetAddress);
 
                         }
+                        Debug.Log("Exit User_Quit case on the client.");
                     }
                     break;
                 default:
