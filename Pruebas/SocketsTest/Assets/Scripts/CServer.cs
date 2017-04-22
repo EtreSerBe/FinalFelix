@@ -110,25 +110,11 @@ public struct ClientTimers
 
 public class CServer : MonoBehaviour
 {
-    /*< Cached server. */
-    //static CServer m_CachedServer;
-    //CThreadManager m_ThreadManager;
-
     public string m_szMulticastIP = "223.0.0.0"; //default INVALID Multicast IP for this program.
     public int m_iMulticastPort = 10000;
     public float m_fMaxTimeSinceLastHeartBeat = 10.0f;// Value which, when exceeded, will cause the server to disconnect the given user.
 
-    //Socket  m_Socket,
-    //		m_SocketTick;
-    //Supposedly, this one will no longer be necessary.
-    //UdpClient m_udpServer;
-
     public CClient m_pClientRef = null;
-
-    //ArrayList m_lstClients = new ArrayList();
-    //Used to store information about the connected clients to this server.
-    //List<ClientInfo> m_lstClientInfo = new List<ClientInfo>();
-    //HashSet<ClientInfo> m_setClientInfo = new HashSet<ClientInfo>();
     Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
     public Dictionary<string, ClientTimers> m_dicClientTimers = new Dictionary<string, ClientTimers>(); //This one is exclusive to the server, so it is separated from ClientInfo, which was previously joint.
     public List<Message> m_MessagesList = new List<Message>();
@@ -152,30 +138,6 @@ public class CServer : MonoBehaviour
         return iHighest;
     }
 
-    /*public static CServer CachedServer
-	{
-		get { return m_CachedServer; }
-	}*/
-
-	void Awake( )
-	{
-		//m_ThreadManager = new CThreadManager();
-		//m_CachedServer = this;
-
-		//m_Socket = new Socket( AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
-		////m_SocketTick = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
-		//IPEndPoint ipLocal = new IPEndPoint(IPAddress.Any, 10000);
-		//m_Socket.ExclusiveAddressUse = false;
-		////m_Socket.Blocking = false;
-		//m_Socket.Bind( ipLocal );
-		//m_Socket.Listen( 100 );
-		////m_SocketTick.Listen( 11000 );
-		//Thread newThread = new Thread( openTCP );
-		//Thread newThread2 = new Thread( openUDP );
-		//newThread.Start();
-		//newThread2.Start();
-	}
-
     //This coroutine is used by the Server Machine to decide if a user has gone DISCONNECTED.
     public IEnumerator CheckHeartBeatCoroutine(string in_szIPAddress)
     {
@@ -184,7 +146,7 @@ public class CServer : MonoBehaviour
         ClientTimers OutClientInfo;
         if (!m_dicClientTimers.TryGetValue(in_szIPAddress, out OutClientInfo))
         {
-            Debug.LogWarning("Warning, checking the Timeout HeartBeat for a client which is not registered on the KnownClients Dictionary.");
+            Debug.LogWarning("Warning, checking the Timeout HeartBeat for a client which is not registered on the KnownClients Timers Dictionary.");
         }
 
         System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
@@ -192,11 +154,23 @@ public class CServer : MonoBehaviour
             || TimeDiff.Minutes > 0) //if more than a minute has elapsed since last heartbeat, disconnect that user.
         {
             //TO DO: Send the notification to all users.
-            //Then, this user is to be considered Inactive, and therefore removed from the group.
+            //Then, this user is to be considered Inactive, and therefore removed from the group. //also remove it from the Timers info.
             Debug.LogWarning("Warning, the user with IP: " + in_szIPAddress + " is NON-RESPONSIVE TO HEARTBEAT and will be removed from the group.");
-            bool bRemovalSuccess = m_dicKnownClients.Remove(in_szIPAddress);
-            m_dicClientTimers.Remove(in_szIPAddress);//also remove it from the Timers info.
-            Debug.Log("The removal of the client was: " + bRemovalSuccess.ToString());
+            // NOTE::: VERIFY IF IT IS NECESSARY TO REMOVE IT FROM THE SERVER'S m_dicKnownClients, or only on the client's one. I HAVE MY DOUBTS ABOUT THIS.
+            if (m_dicKnownClients.ContainsKey(in_szIPAddress))
+            {
+                m_dicKnownClients.Remove(in_szIPAddress);
+            }
+            else
+            {
+                Debug.LogWarning("Warning, tried to remove an IP which is not Known to the Server. IP was: " + in_szIPAddress);
+            }
+            //In this point, we've already checked if this IP is in the Timers Dictionary.
+            m_dicClientTimers.Remove(in_szIPAddress);
+            Debug.Log("The removal of the client was: SUCCESSFUL.");
+
+            //Then, communicate the removal to the Multicast Group.
+            m_pClientRef.SendUDPMessageToGroup('N', "User_Disconnect", in_szIPAddress + '\t' + "No_HeartBeat"); //The content is the address of the user to be removed.
         }
     }
 
@@ -218,9 +192,21 @@ public class CServer : MonoBehaviour
             //TO DO: Send the notification to all users.
             //Then, this user is to be considered Inactive, and therefore removed from the group.
             Debug.LogWarning("Warning, the user with IP: " + in_szIPAddress + " is INACTIVE IN GAME and will be removed from the group.");
-            bool bRemovalSuccess = m_dicKnownClients.Remove(in_szIPAddress);
-            m_dicClientTimers.Remove(in_szIPAddress);//remove it from the timers info too.
-            Debug.Log("The removal of the client was: " + bRemovalSuccess.ToString());
+            // NOTE::: VERIFY IF IT IS NECESSARY TO REMOVE IT FROM THE SERVER'S m_dicKnownClients, or only on the client's one. I HAVE MY DOUBTS ABOUT THIS.
+            if (m_dicKnownClients.ContainsKey(in_szIPAddress))
+            {
+                m_dicKnownClients.Remove(in_szIPAddress);
+            }
+            else
+            {
+                Debug.LogWarning("Warning, tried to remove an IP which is not Known to the Server. IP was: " + in_szIPAddress);
+            }
+            //In this point, we've already checked if this IP is in the Timers Dictionary.
+            m_dicClientTimers.Remove(in_szIPAddress);
+            Debug.Log("The removal of the client was: SUCCESSFUL.");
+
+            //Then, communicate the removal to the Multicast Group.
+            m_pClientRef.SendUDPMessageToGroup('N', "User_Disconnect", in_szIPAddress + '\t' + "Inactive"); //The content is the address of the user to be removed.
         }
     }
 
@@ -250,9 +236,6 @@ public class CServer : MonoBehaviour
     public void StartServer( CClient in_pClientRef,  Dictionary<string , ClientInfo> in_refKnownClients)
     {
         Debug.Log("Entered StartServer function.");
-        //m_udpServer.Client.ExclusiveAddressUse = false; //as it'll send and recieve.
-        //m_udpServer = new UdpClient(/*10000*/); //port 10,000 as a convention
-
         m_pClientRef = in_pClientRef;//Copy the reference, so it can be later used to use its socket to send and receive.
 
         if (m_pClientRef.m_szMulticastIP == "223.0.0.0") //if it is equal to thge default Multicast address, then it's a complete new server-
@@ -273,18 +256,12 @@ public class CServer : MonoBehaviour
         }
 
         Debug.LogWarning("The IP Address and port for the Multicast group are:  " + m_szMulticastIP + " : " + m_iMulticastPort.ToString());
-        
         m_dicKnownClients.Clear();//Clear it from any possible trash from other executions o something else.
 
         m_dicKnownClients = new Dictionary<string, ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
-        m_iCurrentID = GetHighestID(); //The highest (lowest, in this case) ID given in the elements of "m_setClientInfo".
-
-
-        //m_udpServer.BeginReceive(new AsyncCallback(ServerReceiveCallback), null); //To start receiving asynchronously.
+        m_iCurrentID = GetHighestID(); //The highest  ID given in the elements of "m_setClientInfo". So we know which is the next ID to generate.
         Debug.Log("Exit of StartServer function.");
     }
-
-
 
     void Update()
     {
@@ -357,7 +334,6 @@ public class CServer : MonoBehaviour
                             //TO DO 
                             Debug.Log("TODO-----Sending to everyone else the info about the recently connected client.");
                             //PUT THE SEND COMMAND TO THE Multicast Group.
-
                         }
                         else
                         {
@@ -386,17 +362,11 @@ public class CServer : MonoBehaviour
                         Debug.LogError("ERROR: The server received a pActualMessage.m_szMessageType with value: " + pActualMessage.m_szMessageType);
                     }
                     break;
-
-
             }
 
-            //Begin connection message.
-
             //In-game message, such as action performed.
-
             
         }
-
     }
 
     private bool IsNewIPAddress(ClientInfo in_AddressToCheck)
@@ -405,70 +375,8 @@ public class CServer : MonoBehaviour
         {
             return false;
         }
-
         //If no address like that has been registered, return true.
         return true;
     }
 
-	//void openTCP( )
-	//{
-	//	try
-	//	{
-	//		Socket tmpSocket = m_Socket.Accept();
-	//		if ( tmpSocket != null )
-	//		{
-	//			string ipAddress = ((IPEndPoint)tmpSocket.RemoteEndPoint).Address.ToString();
-	//			Debug.Log( ipAddress );
-	//			CClientHandler newClient = new CClientHandler( tmpSocket, ipAddress );
-	//			Thread newThread = new Thread( newClient.run );
-	//			m_lstClients.Add( newClient );
-	//			m_ThreadManager.AddThread( newClient.run );
-	//			newThread.Start();
-	//		}
-	//	}
-	//	catch ( SocketException e )
-	//	{
-	//		//Debug.Log( e );
-	//	}
-	//}
-	//void openUDP( )
-	//{
-	//}
 }
-
-//public class CThreadManager
-//{
-//	ArrayList m_lstThreads = new ArrayList();
-//	public CThreadManager()
-//	{
-//	}
-//	public void AddThread( ThreadStart in_function )
-//	{
-//		Thread newThread = new Thread( in_function );
-//		m_lstThreads.Add( newThread );
-//	}
-//	public void EndThread( int in_ThreadNumber )
-//	{
-//		( (Thread)m_lstThreads[in_ThreadNumber] ).Interrupt();//If necessary use abort.
-//		m_lstThreads.RemoveAt( in_ThreadNumber );
-//	}
-//}
-
-
-//public class CClientHandler
-//{
-//	Socket m_Socket;
-//	string m_strIpAddress;
-//	public CClientHandler( Socket in_Socket, string in_strIpAddress )
-//	{
-//		m_Socket = in_Socket;
-//		m_strIpAddress = in_strIpAddress;
-//	}
-//	public void run( )
-//	{
-//		while ( true )
-//		{
-//			Debug.Log( "Update: " + m_strIpAddress );
-//		}
-//	}
-//}
