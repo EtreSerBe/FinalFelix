@@ -270,7 +270,12 @@ public class CServer : MonoBehaviour
 
     private void ProcessMessages()
     {
-        
+        if (m_MessagesList.Count != 0)
+        {
+            Debug.LogWarning("There are: " + m_MessagesList.Count + " messages waiting to be processed in the SERVER.");
+            Debug.LogWarning("This SERVER knows: " + m_dicKnownClients.Count + " clients at this time.");
+        }
+
         while (m_MessagesList.Count != 0)
         {
             Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.

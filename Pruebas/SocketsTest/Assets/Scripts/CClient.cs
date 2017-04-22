@@ -77,7 +77,7 @@ public class CClient : MonoBehaviour
     private void OnApplicationQuit()
     {
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
-        Debug.Log("Quitting application, notifying the Server, so he notifies everyone else.");
+        Debug.LogWarning("Quitting application, notifying the Server, so he notifies everyone else. Notifing the server: " + m_szServerIP);
         //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
         Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
         byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
@@ -88,6 +88,7 @@ public class CClient : MonoBehaviour
         byte[] msgBytesGroup = Encoding.UTF8.GetBytes(NewGroupMessage.ToString());
         m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
         //SendUDPMessageToGroup('N', "User_Quit", "Empty");
+        m_udpClient.Close(); // this might need a super flag or something to avoid doing anything else when this is activated.
     }
 
     //CallBack, it's automatically called when the socket receives anything.
@@ -156,22 +157,6 @@ public class CClient : MonoBehaviour
         }
         //Finally, begin receiving again.
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
-    }
-
-    //This one is used to differentiate between messages to the server and messages received by someone who is trying to access the service.
-    private bool  DispatchMessageToServer( Message in_pDispatchMessage )
-    {
-        //Decode the "time" or something like that so it helps filter old messages.
-        //this is to be able to sort the messageList according to how old they are. ???
-        //First, check if it is for the client or for the server (if this machine happens to be the server too).
-        if (m_pServer != null && in_pDispatchMessage.m_cIsForServer == 'Y')
-        {
-            //Then, it means it is destined for the server part, not the client. And the server ir running on this machine.
-            m_pServer.m_MessagesList.Add(in_pDispatchMessage);
-            //Debug.Log("The message just got passed to the SERVER, not to this client. Its content is: " + in_pDispatchMessage.ToString());
-            return true;
-        }
-        return false;
     }
 
     private void sendCallback(IAsyncResult res)
@@ -270,6 +255,12 @@ public class CClient : MonoBehaviour
     //
     void ProcessMessage()
     {
+        if (m_MessagesList.Count != 0)
+        {
+            Debug.LogWarning("There are: " + m_MessagesList.Count + " messages waiting to be processed in the client.");
+            Debug.LogWarning("This client knows: " + m_dicKnownClients.Count + " clients at this time.");
+        }
+
         //First, check if it is a recent message, or if you can have a 
         //Check if the message belongs to you or the server.
         while (m_MessagesList.Count != 0)
@@ -304,9 +295,10 @@ public class CClient : MonoBehaviour
                             m_szMulticastIP = ConnAcceptedContent[0];
                             m_iMulticastPort = int.Parse(ConnAcceptedContent[1]);
                             m_iID = int.Parse(ConnAcceptedContent[2]);
+                            m_szServerIP = ConnAcceptedContent[3];
                             //he multicast address range is 224.0.0.0 to 239.255.255.255. If you specify an address outside this range or if the router to which 
                             //the request is made is not multicast enabled, UdpClient will throw a SocketException.
-                            Debug.LogWarning("A connection has been accepted. This client: " + m_szClientIP + " will join the multicast Group: " + m_szMulticastIP + " in port: " + m_iMulticastPort.ToString());
+                            Debug.LogWarning("A connection has been accepted. This client: " + m_szClientIP + " will join the multicast Group: " + m_szMulticastIP + " in port: " + m_iMulticastPort.ToString() + " The IP of the server is: " + m_szServerIP);
                             m_udpClient.JoinMulticastGroup(IPAddress.Parse(m_szMulticastIP)); //NOTE:: CHECK THAT THE PORT IS NOT NECESSARY?
                             ClientInfo tmpThisClientInfo = new ClientInfo( m_iID, m_szClientIP);
                             m_dicKnownClients.Add(m_szClientIP, tmpThisClientInfo);
@@ -319,14 +311,14 @@ public class CClient : MonoBehaviour
                         Debug.Log("Entered New_User case.");
                         string[] NewUserContent = pActualMessage.m_szMessageContent.Split('\t');
                         // 1 is the new user ID ; 2 is the new user IP.
-                        if (NewUserContent.Length != 2) // see that there must be 3 parameters in the content of this message.
+                        if (NewUserContent.Length != 2) // see that there must be 2 parameters in the content of this message.
                         {
                             Debug.LogError("The -m_szMessageContent- of a New_User message is not in the correct format. It was: " + pActualMessage.m_szMessageContent);
                         }
                         else
                         {
                             ClientInfo tmpNewClient = new ClientInfo( int.Parse(NewUserContent[0]) , NewUserContent[1]);
-                            Debug.Log("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
+                            Debug.LogWarning("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
                             m_dicKnownClients.Add(tmpNewClient.m_szIPAdress, tmpNewClient); //we add it to the Dictionary of known clients.
                             Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
@@ -353,7 +345,7 @@ public class CClient : MonoBehaviour
                         {
                             if (m_dicKnownClients.ContainsKey(szMessageContent[0]))
                             {
-                                Debug.Log("Removing from Known clients the IP: " +  szMessageContent[0] + "because it is: " + szMessageContent[1]); //print the reason for the disconnection.
+                                Debug.LogWarning("Removing from Known clients the IP: " +  szMessageContent[0] + "because it is: " + szMessageContent[1]); //print the reason for the disconnection.
                                 m_dicKnownClients.Remove(szMessageContent[0]);
                             }
                             else
