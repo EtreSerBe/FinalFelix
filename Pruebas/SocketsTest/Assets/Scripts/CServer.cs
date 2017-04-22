@@ -256,7 +256,7 @@ public class CServer : MonoBehaviour
         }
 
         Debug.LogWarning("The IP Address and port for the Multicast group are:  " + m_szMulticastIP + " : " + m_iMulticastPort.ToString());
-        m_dicKnownClients.Clear();//Clear it from any possible trash from other executions o something else.
+        //m_dicKnownClients.Clear();//Clear it from any possible trash from other executions o something else.//Shouldn't be necessary.
 
         m_dicKnownClients = new Dictionary<string, ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
         m_iCurrentID = GetHighestID(); //The highest  ID given in the elements of "m_setClientInfo". So we know which is the next ID to generate.
@@ -306,6 +306,8 @@ public class CServer : MonoBehaviour
                                 //NOTE:::: CHECK IF IT IS NECESSARY TO PASS THE SERVER IP too.
                                 Message MulticastAddressMsg = new Message('N', m_pClientRef.m_iID.ToString(),  pActualMessage.m_szTargetAddress, "Conn_Accepted", m_pClientRef.m_szClientIP, (m_szMulticastIP + "\t" + m_iMulticastPort.ToString() + "\t" + tmpInfo.m_iID.ToString() + "\t" + m_pClientRef.m_szServerIP));
                                 m_pClientRef.SendUDPMessage(MulticastAddressMsg, /*IPAddress.Parse(pActualMessage.m_szTargetAddress)*/ pActualMessage.m_szTargetAddress, 10000); //send it by the default port: 10000, TO THE SPECIFIC CLIENT.
+                                //Also, send all the info about the other clients to this one.
+                                SendKnownClientsDic(pActualMessage.m_szTargetAddress);
 
                                 //Now, send a message to that user, confirming its connection was successful. 
                                 Debug.LogWarning("A new client is being connected. Notifying all other active users about this. Its ID will be: " + tmpInfo.m_iID);
@@ -366,6 +368,17 @@ public class CServer : MonoBehaviour
 
             //In-game message, such as action performed.
             
+        }
+    }
+
+    //Send many messages to the specified in_szAddress, each one contains the information about one client known to the server.
+    private void SendKnownClientsDic( string in_szAddress )
+    {
+        //NOTE:: This might get Heavy when there are a lot of users.
+        Debug.Log("Sending the info about known clients to the address: " + in_szAddress);
+        foreach ( KeyValuePair<string , ClientInfo> cl in m_dicKnownClients )
+        {
+            m_pClientRef.SendUDPMessage('N', "Known_User", cl.Value.m_iID + '\t' + cl.Value.m_szIPAdress, in_szAddress, 10000);
         }
     }
 

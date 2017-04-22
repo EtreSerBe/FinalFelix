@@ -89,7 +89,7 @@ public class CClient : MonoBehaviour
 
         IPEndPoint RemoteIpEndPoint;
         //Receive messages especifically sent to this client's IP by the server.
-        RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(m_szServerIP), 10000);
+        RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 10000); //WARNING :::::::::: SHOULD THIS BE "ANY" OR SHOULD WE JUST RECEIVE FROM SERVER AND MULTICAST GROUP?
         byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
         m_udpClient.BeginReceive(new AsyncCallback(recv), null);
         Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
@@ -137,7 +137,7 @@ public class CClient : MonoBehaviour
             //This is where we start the check for inactivity of the users, inside the Coroutine.
             if (m_pServer != null) //check if this Node is the same one as the server, if it is, then it must check the timeouts.
             {
-                m_pServer.UpdateLastMessageFromAddress(pReceivedMessage.m_szTargetAddress);//check this values.
+                //m_pServer.UpdateLastMessageFromAddress(pReceivedMessage.m_szTargetAddress);//check this values.
             }
         }
         else
@@ -261,6 +261,11 @@ public class CClient : MonoBehaviour
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
             Debug.Log("Processing message with info: " + pActualMessage.ToString());
 
+            if (pActualMessage.m_szDestinationAddress == m_szMulticastIP && m_pServer != null)
+            {
+                m_pServer.UpdateLastMessageFromAddress(pActualMessage.m_szTargetAddress);//check this values.
+            }
+
             //Check which type of message is.
             switch (pActualMessage.m_szMessageType)
             {
@@ -343,6 +348,30 @@ public class CClient : MonoBehaviour
                         Debug.Log("Exit User_Disconnect case.");
                     }
                     break;
+                case "Known_User":
+                    {
+                        Debug.Log("Entered Known_User case. Trying to add it to the Known Clients dictionary.");
+                        //1- ID of the client. 2- IP related to that ID.
+                        string[] szMessageContent = pActualMessage.m_szMessageContent.Split('\t');
+                        if (szMessageContent.Length != 2) // see that there must be 3 parameters in the content of this message.
+                        {
+                            Debug.LogError("The -m_szMessageContent- of a Known_User message is not in the correct format. It was: " + pActualMessage.m_szMessageContent);
+                        }
+                        else
+                        {
+                            if (m_dicKnownClients.ContainsKey(szMessageContent[1]))
+                            {
+                                Debug.Log("This client already knows the ID and IP: " + szMessageContent[0] + " : " + szMessageContent[1]); //Notify which one is "repeated"
+                            }
+                            else
+                            {
+                                m_dicKnownClients.Add(szMessageContent[1], new ClientInfo(int.Parse(szMessageContent[0]), szMessageContent[1])); // add the new info.
+                            }
+                            Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
+                        }
+                        Debug.Log("Exit Known_User case.");
+                    }
+                    break;
 
 
             }
@@ -357,22 +386,26 @@ public class CClient : MonoBehaviour
     {
         //Check the conditions to become the new server.
         //If a server has been chosen, return that ID, else, return this client's ID.
-        m_iServerID = GetLowestID();
-        //m_szServerIP = TODO.
+        m_iServerID = GetLowestID(); //Note that the ServerIP is also set in the GetLowestID function.
         return m_iServerID; //Default value.
     }
 
+    //It also sets the m_szServerIP value.
     private int GetLowestID()
     {
         int iLowest = int.MaxValue;//Start it on the highest possible value.
         if ( m_dicKnownClients.Count == 0 ) //if it's empty, then the client chooses itself by default.
-        { iLowest = m_iID; }
+        { iLowest = m_iID; m_szServerIP = m_szClientIP; }
         else
         {
             //Else, we iterate to check the lowest ID available in the dictionary.
             foreach (KeyValuePair<string, ClientInfo> cinfo in m_dicKnownClients)
             {
-                iLowest = iLowest > cinfo.Value.m_iID ? cinfo.Value.m_iID : iLowest; //If in one line to update the actual iHighest.
+                if (iLowest > cinfo.Value.m_iID)
+                {
+                    iLowest = cinfo.Value.m_iID;
+                    m_szServerIP = cinfo.Value.m_szIPAdress;
+                }
             }
         }
        
