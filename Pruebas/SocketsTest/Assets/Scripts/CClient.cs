@@ -78,8 +78,16 @@ public class CClient : MonoBehaviour
     {
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
         Debug.Log("Quitting application, notifying the Server, so he notifies everyone else.");
-        SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
-        SendUDPMessageToGroup('N', "User_Quit", "Empty");
+        //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
+        Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
+        byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+        m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
+
+        //Now to the multicast group synchronously.
+        Message NewGroupMessage = new Message('N', m_iID.ToString(), m_szClientIP, "User_Quit", m_szMulticastIP, "Empty");
+        byte[] msgBytesGroup = Encoding.UTF8.GetBytes(NewGroupMessage.ToString());
+        m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
+        //SendUDPMessageToGroup('N', "User_Quit", "Empty");
     }
 
     //CallBack, it's automatically called when the socket receives anything.
@@ -183,6 +191,8 @@ public class CClient : MonoBehaviour
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(in_szAddress), in_iPort);
         m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the broadcast.
     }
+
+
 
     //facility to be a little more organized.
     public void SendUDPMessage(Message in_pMessage, string in_szAddress, int in_iPort)
