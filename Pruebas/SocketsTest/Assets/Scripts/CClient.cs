@@ -101,6 +101,13 @@ public class CClient : MonoBehaviour
         m_udpClient.Close(); // this might need a super flag or something to avoid doing anything else when this is activated.
     }
 
+    //Used to be called N seconds after a BackOff has been decided.
+    public void BackOffInvoke()
+    {
+        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+        m_fTimeSinceLastResponse = 0.0f; //Restart the timer for the last response. It was disabled to avoid disasters. 9:55pm 22/04
+    }
+
     //CallBack, it's automatically called when the socket receives anything.
     private void recv(IAsyncResult res)
     {
@@ -141,7 +148,8 @@ public class CClient : MonoBehaviour
                 {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
                     //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
-                    m_fTimeSinceLastResponse = 0.0f;
+                    m_fTimeSinceLastResponse = -1000.0f;//Set the timer to an incredibly invalid value. It will be reset in the Invoked method.
+                    Invoke("BackOffInvoke", 5.0f);
                 }
                 else if( tmpLTimeDiff < -10000000 )
                 {
@@ -155,7 +163,7 @@ public class CClient : MonoBehaviour
         else if (pReceivedMessage.m_szDestinationAddress == m_szClientIP)
         {
             //Also, reset the time since the last message was received.
-            m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
+            //m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
             //Then, it was specifically to this IP.
             Debug.Log("A message to this SPECIFIC ADDRESS -" + m_szClientIP + " was received, its contents are: " + pReceivedMessage.ToString());
             if (pReceivedMessage.m_cIsForServer == 'Y')
@@ -249,7 +257,7 @@ public class CClient : MonoBehaviour
         //If it has, process it.
         m_fTimeSinceLastResponse += Time.deltaTime;
 
-        if (m_fTimeSinceLastResponse >= m_fMaxTimeSinceLastResponse && bDisconnected == false )
+        if (m_fTimeSinceLastResponse >= m_fMaxTimeSinceLastResponse && bDisconnected == false && m_MessagesList.Count == 0 )//Check if it has no more messages to be processed.
         {
             bDisconnected = true;
             //Now, we intend to disconnect, and try to select a new leader.
@@ -271,7 +279,7 @@ public class CClient : MonoBehaviour
                 m_szServerIP = m_szClientIP; //Make the IP of the server the same as this client's IP.
                 gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
                 m_pServer = gameObject.GetComponent<CServer>();
-                SendUDPMessage('Y', "Begin_Con", DateTime.UtcNow.ToString(), IPAddress.Broadcast.ToString(), 10000);
+                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
                 //bDisconnected = false; //JUST FOR TESTING.
             }
             else
@@ -432,8 +440,9 @@ public class CClient : MonoBehaviour
                     break;
                 case "Back_Off":
                     {
-                        Debug.Log("Entering and Exiting the Back_Off case. It was sent by: " + pActualMessage.m_szTargetAddress);
-                        m_fTimeSinceLastResponse = 0.0f;
+                        Debug.LogWarning("Entering and Exiting the Back_Off case. It was sent by: " + pActualMessage.m_szTargetAddress );
+                        m_fTimeSinceLastResponse = -1000.0f;//Set the timer to an incredibly invalid value. It will be reset in the Invoked method.
+                        Invoke("BackOffInvoke", 5.0f);
                     }
                     break;
 
