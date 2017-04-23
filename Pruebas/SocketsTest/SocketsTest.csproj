@@ -80,6 +80,7 @@
     <Compile Include="Assets\NetworkCursor.cs" />
     <Compile Include="Assets\Scripts\CClient.cs" />
     <Compile Include="Assets\Scripts\CGlobals.cs" />
+    <Compile Include="Assets\Scripts\CMicRecorder.cs" />
     <Compile Include="Assets\Scripts\CServer.cs" />
     <Compile Include="Assets\SendNetworkCursor.cs" />
     <Compile Include="Assets\Server.cs" />
