@@ -135,12 +135,19 @@ public class CClient : MonoBehaviour
                 Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString() + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString() );
                 //Debug.LogWarning((tmpReceivedDate < m_dtBeginDateTime) + " y está en UTC?" + tmpReceivedDate.Kind.ToString()); //It is MANDATORY that they are both in the UTC format.
                 //Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks < m_dtBeginDateTime.Ticks));
+                long tmpLTimeDiff = (m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks);
                 //If the BeginTime is at least 10,000,000 nanoseconds greater, then it must wait for the other client to become server.
-                if ((m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks) > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
+                if ( tmpLTimeDiff > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
                 {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
                     //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
                     m_fTimeSinceLastResponse = 0.0f;
+                }
+                else if( tmpLTimeDiff < 10000000 )
+                {
+                    Debug.LogWarning("Sending Back_Off message to the address: " + pReceivedMessage.m_szTargetAddress);
+                    //Send a message to the other client, letting it know that this client came first, so it has priority.
+                    SendUDPMessage('N', "Back_Off", "Empty", pReceivedMessage.m_szTargetAddress, 10000); //The content might be used in some other way.
                 }
                 //else //so, this client can continue its execution normally, the other one must be the one to wait N seconds longer.
             }
@@ -421,6 +428,12 @@ public class CClient : MonoBehaviour
                             m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
                         }
                         Debug.LogWarning("Exit User_Quit case on the client.");
+                    }
+                    break;
+                case "Back_Off":
+                    {
+                        Debug.Log("Entering and Exiting the Back_Off case. It was sent by: " + pActualMessage.m_szTargetAddress);
+                        m_fTimeSinceLastResponse = 0.0f;
                     }
                     break;
 
