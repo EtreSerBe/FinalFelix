@@ -130,11 +130,13 @@ public class CClient : MonoBehaviour
             //Otherwise, we just ignore it.
             else
             {
-                DateTime tmpReceivedDate = DateTime.Parse(pReceivedMessage.m_szMessageContent).ToUniversalTime();//UTC format is mandatory to do the comparison
+                //NOTICE: The thing with the comparisons is the NANOSECONDS, which can cause a slight difference between two dates.
+                DateTime tmpReceivedDate = DateTime.Parse(pReceivedMessage.m_szMessageContent);//UTC format is mandatory to do the comparison
                 Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString() + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString() );
                 //Debug.LogWarning((tmpReceivedDate < m_dtBeginDateTime) + " y está en UTC?" + tmpReceivedDate.Kind.ToString()); //It is MANDATORY that they are both in the UTC format.
-                if ( tmpReceivedDate < m_dtBeginDateTime ) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
-                {
+                //Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks < m_dtBeginDateTime.Ticks));
+                if ((tmpReceivedDate.Ticks - m_dtBeginDateTime.Ticks) > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
+                {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
                     //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
                     m_fTimeSinceLastResponse = 0.0f;
