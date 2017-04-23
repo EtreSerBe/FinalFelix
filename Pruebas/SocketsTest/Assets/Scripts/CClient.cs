@@ -143,7 +143,7 @@ public class CClient : MonoBehaviour
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
                     m_fTimeSinceLastResponse = 0.0f;
                 }
-                else if( tmpLTimeDiff < 10000000 )
+                else if( tmpLTimeDiff < -10000000 )
                 {
                     Debug.LogWarning("Sending Back_Off message to the address: " + pReceivedMessage.m_szTargetAddress);
                     //Send a message to the other client, letting it know that this client came first, so it has priority.
