@@ -144,12 +144,12 @@ public class CClient : MonoBehaviour
                 //Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks < m_dtBeginDateTime.Ticks));
                 long tmpLTimeDiff = (m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks);
                 //If the BeginTime is at least 10,000,000 nanoseconds greater, then it must wait for the other client to become server.
-                if ( tmpLTimeDiff > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
+                if (tmpLTimeDiff > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
                 {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
                     //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
-                    m_fTimeSinceLastResponse = -1000.0f;//Set the timer to an incredibly invalid value. It will be reset in the Invoked method.
-                    Invoke("BackOffInvoke", 5.0f);
+                    Message pAutoMessage = new Message('N', m_iID.ToString(), m_szClientIP, "Back_Off", m_szClientIP, "Empty");//this message won't be send, it's automatically enqueued to be processed by this very same client.
+                    m_MessagesList.Add(pAutoMessage); //A PATCH TO SEE IF IT WORKS CORRECTLY
                 }
                 else if( tmpLTimeDiff < -10000000 )
                 {
