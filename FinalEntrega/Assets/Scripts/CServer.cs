@@ -108,6 +108,18 @@ public struct ClientTimers
     }
 };
 
+public struct GameInstantState
+{
+    //Used to represent the "number" of message, in the exchange of messages. 
+    //NOTE: the server must hold record of the latest message it has received from each client, so it can discard older messages?.
+    public int m_iMessageIndex;
+    // I have my doubts about this one. Maybe it should be an array of values which can be used as input. (I.E: The whole keyboard state if needed).
+    public string m_szInput; //Might be like the Gyroscope event generated.
+    public Vector3 m_vPosition;
+    public Vector3 m_vRotationEulerAngles;
+    //Maybe also store Speed?? or something like that?
+};
+
 public class CServer : MonoBehaviour
 {
     public string m_szMulticastIP = "223.0.0.0"; //default INVALID Multicast IP for this program.
