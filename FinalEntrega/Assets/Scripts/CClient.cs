@@ -79,13 +79,23 @@ public class CClient : MonoBehaviour
     private void OnApplicationQuit()
     {
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
+        //NOTE::: Remember that we use send so "Ensure" the transmision is made. That's why we don't call our standard SendUDP functions, as they use BeginSend.
         Debug.LogWarning("Quitting application, notifying the Server, so he notifies everyone else. Notifing the server: " + m_szServerIP);
         if (m_szServerIP != "0.0.0.0")
         {
             //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
-            Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
-            byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
-            m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
+            if (m_pServer == null)
+            {
+                Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
+                byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+                m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
+            }
+            else
+            {
+                //Then, this node is the leader, so it has to cause an INSTANT RE-ELECTION of the leader. There's no need to do anything here, the check 
+                //is done at the reception of the User_Quit message.
+                Debug.LogWarning("The Leader is Quitting Application, this will cause an Instant Re-Election.");
+            }
 
             //Now to the multicast group synchronously.
             Message NewGroupMessage = new Message('N', m_iID.ToString(), m_szClientIP, "User_Quit", m_szMulticastIP, "Empty");
@@ -268,30 +278,7 @@ public class CClient : MonoBehaviour
             Debug.LogWarning("Trying to select a new leader/host.");
             //here, this client must check if it meets the requirements to be the new leader, such as if it has a table of other candidates or something else.
 
-            if (SelectNewServer() == m_iID ) 
-            {
-                if (m_pServer != null) //need to check for null, so it doesnt add more than one.
-                {
-                    Debug.LogError("ERROR, tried to start a server when there's already in this client's machine.");
-                    return;//exit this function.
-                }
-                //Start a server in this machine.
-                Debug.LogWarning("This machine will now host the server. Initializing.");
-                gameObject.AddComponent<CServer>(); //Add a CServer component to this gameObject, so a new Server starts. 
-                m_szServerIP = m_szClientIP; //Make the IP of the server the same as this client's IP.
-                gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
-                m_pServer = gameObject.GetComponent<CServer>();
-                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
-                //bDisconnected = false; //JUST FOR TESTING.
-            }
-            else
-            {
-                //Wait some time and then try to connect to the new leader.
-                Debug.LogWarning("Another machine will host the server, it's ID is: " + m_szServerIP);
-                //NOTE::: MAKE THE M_SZsERVERIP equal to the IP of the new server machine.
-                bDisconnected = false; //??
-                m_fTimeSinceLastResponse = 0.0f; // so it doesn't try many times while waiting for the other user to become the server.
-            }
+            SelectNewServer();//Yes, it needs to reconnect, as it is the first time this node is a server.
         }
         else
         {
@@ -436,6 +423,12 @@ public class CClient : MonoBehaviour
                             //Maybe show an IN-GAME notification about this would be good.
                             Debug.LogWarning("A user has Quit the application. Removing it from the known clients. Its IP was: " + pActualMessage.m_szTargetAddress);
                             m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
+                            //Also, we need to check if the one who disconnected was the Current leader. If so, It will cause an instant re-election.
+                            if ( pActualMessage.m_szTargetAddress == m_szServerIP )
+                            {
+                                Debug.LogWarning(" Instant Reelection caused, the leader has quit the application. New leader being elected. No need ");
+                                SelectNewServer();//It does everything needed to select a new leader. //Remember that also the Server_IP is set in that function.
+                            }
                         }
                         Debug.LogWarning("Exit User_Quit case on the client.");
                     }
@@ -473,11 +466,39 @@ public class CClient : MonoBehaviour
         }
     }
 
-    int SelectNewServer()
+    int SelectNewServer(  )
     {
         //Check the conditions to become the new server.
         //If a server has been chosen, return that ID, else, return this client's ID.
         m_iServerID = GetLowestID(); //Note that the ServerIP is also set in the GetLowestID function.
+        if (m_iServerID == m_iID)
+        {
+            if (m_pServer != null) //need to check for null, so it doesnt add more than one.
+            {
+                Debug.LogError("ERROR, tried to start a server when there's already in this client's machine.");
+                return -1;//exit this function.
+            }
+            //Start a server in this machine.
+            Debug.LogWarning("This machine will now host the server. Initializing.");
+            gameObject.AddComponent<CServer>(); //Add a CServer component to this gameObject, so a new Server starts. 
+            m_szServerIP = m_szClientIP; //Make the IP of the server the same as this client's IP.
+            gameObject.GetComponent<CServer>().StartServer(this, m_dicKnownClients); //Send this client's set of known clients to the new server.
+            m_pServer = gameObject.GetComponent<CServer>();
+            //This parameter is used to be able to use the same function for two very similar things., for first time and for instant re-election.
+            if(m_dicKnownClients.ContainsKey(m_szClientIP) == false)
+            {
+                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+            }
+            //bDisconnected = false; //JUST FOR TESTING.
+        }
+        else
+        {
+            //Wait some time and then try to connect to the new leader.
+            Debug.LogWarning("Another machine will host the server, it's ID is: " + m_szServerIP);
+            //NOTE::: MAKE THE M_SZsERVERIP equal to the IP of the new server machine.
+            bDisconnected = false; //??
+            m_fTimeSinceLastResponse = 0.0f; // so it doesn't try many times while waiting for the other user to become the server.
+        }
         return m_iServerID; //Default value.
     }
 
