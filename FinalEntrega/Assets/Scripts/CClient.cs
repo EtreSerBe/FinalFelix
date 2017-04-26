@@ -11,6 +11,7 @@ public class CClient : MonoBehaviour
 {
 
     UdpClient m_udpClient;
+	public bool m_bUseCesarCipher = false;
     private float m_fTimeSinceLastResponse = 0.0f;  //This value must be reset when a response from the server is received.
     public float m_fMaxTimeSinceLastResponse = 15.0f;
     public bool m_bAutoReceiveMessages = true; //Deactivate this to stop this client from receiving its own messages.
@@ -88,6 +89,10 @@ public class CClient : MonoBehaviour
             {
                 Message NewMessage = new Message('Y', m_iID.ToString(), m_szClientIP, "User_Quit", m_szServerIP, "Empty");
                 byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+				if ( CGlobals.m_bIsEncrypted == true )
+				{
+					msgBytes = CGlobals.CesarCipher(msgBytes);
+				}
                 m_udpClient.Send(msgBytes, msgBytes.Length, m_szServerIP, 10000);
             }
             else
@@ -100,7 +105,11 @@ public class CClient : MonoBehaviour
             //Now to the multicast group synchronously.
             Message NewGroupMessage = new Message('N', m_iID.ToString(), m_szClientIP, "User_Quit", m_szMulticastIP, "Empty");
             byte[] msgBytesGroup = Encoding.UTF8.GetBytes(NewGroupMessage.ToString());
-            m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
+			if ( CGlobals.m_bIsEncrypted == true )
+			{
+				msgBytesGroup = CGlobals.CesarCipher( msgBytesGroup );
+			}
+			m_udpClient.Send(msgBytesGroup, msgBytesGroup.Length, m_szMulticastIP, 10000);
             //SendUDPMessageToGroup('N', "User_Quit", "Empty");
         }
         else
@@ -120,21 +129,22 @@ public class CClient : MonoBehaviour
 
 
 
-    //CallBack, it's automatically called when the socket receives anything.
-    private void recv(IAsyncResult res)
+	//CallBack, it's automatically called when the socket receives anything.
+	private void recv(IAsyncResult res)
     {
         //Debug.Log("Entered recv function, Callback for the BeginReceive function.");
        
 
         IPEndPoint RemoteIpEndPoint;
-        //Receive messages especifically sent to this client's IP by the server.
+        //Receive messages specifically sent to this client's IP by the server.
         RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0); //WARNING :::::::::: SHOULD THIS BE "ANY" OR SHOULD WE JUST RECEIVE FROM SERVER AND MULTICAST GROUP?
         byte[] received = m_udpClient.EndReceive(res, ref RemoteIpEndPoint);
         
-        Debug.Log("The received data was: " + Encoding.UTF8.GetString(received));
-        Message pReceivedMessage = new Message(received); //Construct the message with the special contructor which receives an array of bytes.
-        //Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
-        if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
+        
+        Message pReceivedMessage = new Message(received); //Construct the message with the special constructor which receives an array of bytes.
+		Debug.Log( "The received data was: " + pReceivedMessage.ToString() );//Now it has to be like this, in case it comes encrypted.
+		//Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
+		if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
         {
             Debug.LogWarning("Message to BROADCAST received from: " + pReceivedMessage.m_szTargetAddress);
             //Then it is from a new user.
@@ -229,6 +239,10 @@ public class CClient : MonoBehaviour
     {
         Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, in_szAddress, in_szMessageContent);
         byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
+		if ( CGlobals.m_bIsEncrypted == true )
+		{
+			msgBytes = CGlobals.CesarCipher(msgBytes);
+		}
         Debug.Log("Sending a message to Endpoint: " + in_szAddress + " and port: " + in_iPort + " from IP: " + m_szClientIP );
         //Send a message to the server.
         
@@ -249,8 +263,11 @@ public class CClient : MonoBehaviour
     {
         Message NewMessage = new Message(in_isForServer, m_iID.ToString(), m_szClientIP, in_szTypeOfMessage, m_szMulticastIP, in_szMessageContent);
         byte[] msgBytes = Encoding.UTF8.GetBytes(NewMessage.ToString());
-
-        Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort + " from IP: " + m_szClientIP);
+		if ( CGlobals.m_bIsEncrypted == true )
+		{
+			msgBytes = CGlobals.CesarCipher( msgBytes );
+		}
+		Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort + " from IP: " + m_szClientIP);
         //Send a message to the server.
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse( m_szMulticastIP), m_iMulticastPort);
         m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the multicast.
@@ -299,7 +316,7 @@ public class CClient : MonoBehaviour
         //Check if the message belongs to you or the server.
         while (m_MessagesList.Count != 0)
         {
-            Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.
+            Message pActualMessage = m_MessagesList[0]; //Get the first element of the container.
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
             Debug.Log("Processing message with info: " + pActualMessage.ToString());
 

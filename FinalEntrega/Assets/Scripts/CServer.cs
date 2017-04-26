@@ -20,12 +20,16 @@ public struct Message
 
     public Message(byte[] in_receivedBytes)
     {
+		if ( CGlobals.m_bIsEncrypted ) //If the Encryption flag is active, then Decrypt the message before constructing it.
+		{
+			in_receivedBytes = CGlobals.CesarCipherDecrypt(in_receivedBytes);
+		}
         string tmpString = Encoding.UTF8.GetString(in_receivedBytes);
         //Debug.Log("Constructing a Message with: " + tmpString);
-        string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  6); //Gives us 5 parts so we can use each one as one of the variables of this object.
+        string[] tmpValuesArray = tmpString.Split("\t".ToCharArray(),  6); //Gives us 6 parts so we can use each one as one of the variables of this object.
         if ( tmpValuesArray.Length != 6 )
         {
-            //Then, the received bytes did not have the correct format (which is, containing 4 tabs '\t' to addecuately make the split).
+            //Then, the received bytes did not have the correct format (which is, containing 4 tabs '\t' to adequately make the split).
             Debug.LogError("A message was constructed without the correct information. it was:  " + tmpString);
             m_cIsForServer = '0';
             m_szSenderID = null;
@@ -154,7 +158,7 @@ public class CServer : MonoBehaviour
     public IEnumerator CheckHeartBeatCoroutine(string in_szIPAddress)
     {
         yield return new WaitForSeconds(m_fMaxTimeSinceLastHeartBeat);
-        //Now, we dow our checking.
+        //Now, we do our checking.
         ClientTimers OutClientInfo;
         if (!m_dicClientTimers.TryGetValue(in_szIPAddress, out OutClientInfo))
         {
@@ -190,7 +194,7 @@ public class CServer : MonoBehaviour
     public IEnumerator CheckTimeSinceLastMessageCoroutine(string in_szIPAddress)
     {
         yield return new WaitForSeconds(m_pClientRef.m_iMaxMinutesSinceLastResponse * 60.0f + (float)m_pClientRef.m_iMaxSecondsSinceLastResponse);
-        //Now, we dow our checking.
+        //Now, we do our checking.
         ClientTimers OutClientInfo;
         if (!m_dicClientTimers.TryGetValue(in_szIPAddress, out OutClientInfo))
         {
@@ -240,8 +244,8 @@ public class CServer : MonoBehaviour
     public void UpdateLastHeartBeatFromAddress(string in_szAddress)
     {
         //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
-        //Debug.Log("Server is resseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
-        //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
+        //Debug.Log("Server is reseting the HEARTBEAT timeout for client with IP: " + in_szAddress);
+        //Stop the actual coroutine Timeout for this address, so we can start a new one.
         StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         if (m_dicClientTimers.ContainsKey(in_szAddress))
         {
@@ -264,7 +268,7 @@ public class CServer : MonoBehaviour
         Debug.Log("Entered StartServer function.");
         m_pClientRef = in_pClientRef;//Copy the reference, so it can be later used to use its socket to send and receive.
 
-        if (m_pClientRef.m_szMulticastIP == "223.0.0.0") //if it is equal to thge default Multicast address, then it's a complete new server-
+        if (m_pClientRef.m_szMulticastIP == "223.0.0.0") //if it is equal to the default Multicast address, then it's a complete new server-
         {
             //We generate a new one, so they don't use a "pre-known" IP address, so we can protect the system a little more.
             int[] iRand = new int[4];
@@ -275,7 +279,7 @@ public class CServer : MonoBehaviour
             m_szMulticastIP = iRand[0].ToString() + "." + iRand[1].ToString() + "." + iRand[2].ToString() + "." + iRand[3].ToString(); //new composed address.
             m_iMulticastPort = 10000;// UnityEngine.Random.Range(10000, 11000);//some range of possible ports.
         }
-        else //else, we adopt the previously stablished Address and port of the multicast group.
+        else //else, we adopt the previously established Address and port of the multicast group.
         {
             m_szMulticastIP = in_pClientRef.m_szMulticastIP;
             m_iMulticastPort = 10000;//NOTE: MUST BE THE SAME AS WHEN YOU BIND/CREATE THE SOCKETS// in_pClientRef.m_iMulticastPort;
@@ -307,7 +311,7 @@ public class CServer : MonoBehaviour
 
         while (m_MessagesList.Count != 0)
         {
-            Message pActualMessage = m_MessagesList[0]; //Get the first element opf the container.
+            Message pActualMessage = m_MessagesList[0]; //Get the first element of the container.
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
 
             Debug.Log("Processing message with contents: " + pActualMessage.ToString());
