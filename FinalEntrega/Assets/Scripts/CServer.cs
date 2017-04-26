@@ -252,6 +252,12 @@ public class CServer : MonoBehaviour
         //else, do nothing and allow the coroutine to continue stopped.
     }
 
+    public void CheckForDoubleLeader()
+    {
+        Debug.LogWarning("Checking for possible multiple leaders. This is a standard procedure to prevent undesired behaviours.");
+        m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+    }
+
     //Starts this component as the active server.
     public void StartServer( CClient in_pClientRef,  Dictionary<string , ClientInfo> in_refKnownClients)
     {
@@ -280,6 +286,9 @@ public class CServer : MonoBehaviour
 
         m_dicKnownClients = new Dictionary<string, ClientInfo>(in_refKnownClients); //Done this way so it copies the elements of that set into its own container.
         m_iCurrentID = GetHighestID(); //The highest  ID given in the elements of "m_setClientInfo". So we know which is the next ID to generate.
+
+        InvokeRepeating("CheckForDoubleLeader", 0.0f, 10.0f);//NOTE:: MUST DE-HARDCODE THIS VALUE OF 10.
+
         Debug.Log("Exit of StartServer function.");
     }
 
@@ -396,6 +405,34 @@ public class CServer : MonoBehaviour
 
                         }
                         Debug.LogWarning("Exit User_Quit case on the SERVER.");
+                    }
+                    break;
+                case "Current_Leader":
+                    {
+                        Debug.LogWarning("Entered Current_Leader case on the Leader.");
+                        DateTime ReceivedStartTime = DateTime.Parse(pActualMessage.m_szMessageContent);
+                        long iTmpTimeDiff = m_pClientRef.m_dtBeginDateTime.Ticks - ReceivedStartTime.Ticks;
+                        if (iTmpTimeDiff > 10000000)//NOTE: this 10,000,000 value is because the DateTime loses some granularity when transformed to string.
+                        {
+                            //Then, this one is the leader that started later, so the other one has priority. All the users in this "subnet" must migrate to the other one.
+                            m_pClientRef.SendUDPMessageToGroup('N', "Migrate", pActualMessage.m_szTargetAddress); //Please be aware that this Node will also receive that message, so the CServer component must be removed.
+                            Debug.LogWarning("Warning: This leader has detected that there's another leader with higher priority, please MIGRATE to its services. Thank you for your comprehension.");
+                            m_pClientRef.m_pServer = null; //IMPORTANT, if we don't do it here, then there could be a lot of errors or troubles to do it later.
+                            Destroy(this);//Removes this script from the gameObject.
+                            //NOTHING FROM THIS POINT ON WILL LONGER BE EXECUTED! THIS COMPONENT IS DESTROYED. DO NOT PUT CODE HERE.
+                        }
+                        else if ( iTmpTimeDiff < -10000000 )
+                        {
+                            //Then, this leader started earlier than the other. It will notify the other, so we just use the Current_Leader message we used before, but directed to an specific node.
+                            m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, 10000);
+                            Debug.LogWarning("This Leader has detected another one, which has been notified that it must incorporate to this group. They should join shortly.");
+                        }
+                        else if ( pActualMessage.m_szTargetAddress == m_pClientRef.m_szClientIP && pActualMessage.m_szSenderID == m_pClientRef.m_iID.ToString() ) // We just check this in case of really weird coincidences.
+                        {
+                            //Even with both those fields, it can be a coincidence. So the time must be checked.
+                            Debug.LogWarning("The Current_Leader message result was that: They are both the same Node.");
+                        }
+                        Debug.LogWarning("Exit the Current_Leader case on the Leader.");
                     }
                     break;
                 default:

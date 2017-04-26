@@ -30,10 +30,10 @@ public class CClient : MonoBehaviour
     List<Message> m_MessagesList = new List<Message>();
     //HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
     Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
-    DateTime m_dtBeginDateTime ;
+    public DateTime m_dtBeginDateTime ;
     //Dictionary<string, int> m_dicPreServerKnownClients = new Dictionary<string, int>();
 
-    CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
+    public CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
 
     public string m_szMulticastIP = "223.0.0.0"; //set by default, the Server might change it for security purposes.
     public int m_iMulticastPort = 10000;
@@ -107,6 +107,8 @@ public class CClient : MonoBehaviour
         SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
         m_fTimeSinceLastResponse = 0.0f; //Restart the timer for the last response. It was disabled to avoid disasters. 9:55pm 22/04
     }
+
+
 
     //CallBack, it's automatically called when the socket receives anything.
     private void recv(IAsyncResult res)
@@ -443,6 +445,23 @@ public class CClient : MonoBehaviour
                         Debug.LogWarning("Entering and Exiting the Back_Off case. It was sent by: " + pActualMessage.m_szTargetAddress );
                         m_fTimeSinceLastResponse = -1000.0f;//Set the timer to an incredibly invalid value. It will be reset in the Invoked method.
                         Invoke("BackOffInvoke", 5.0f);
+                    }
+                    break;
+                case "Migrate":
+                    {
+                        Debug.LogWarning("Warning, entered Migrate case on the Client. This Node will begin connection to that new leader.");
+                        //so, practically we reset this user to be a new one. It must clean its dicKnownUsers and stuff.
+                        m_dicKnownClients.Clear();
+                        m_iID = 0; //Reset the ID.
+                        m_szServerIP = "0.0.0.0";
+                        m_szMulticastIP = "223.0.0.0";
+                        m_iMulticastPort = 10000;
+                        m_fTimeSinceLastResponse = 0.0f;
+                        m_MessagesList.Clear(); //Clear it from any possible messages // DANGEROUS, PLEASE CORROBORATE. 25 / April / 2017.
+                        //Finally, we send the Begin Connection message to the specific address of the new Leader.
+                        //NOTE::: SHOULD WE RESTART THE TIME OF CONNECTION OF EACH USER MIGRATING?
+                        m_dtBeginDateTime = DateTime.UtcNow; //We opted to YES, reset it.
+                        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
                     }
                     break;
 
