@@ -11,7 +11,7 @@ public class CClient : MonoBehaviour
 {
 
     UdpClient m_udpClient;
-	public bool m_bUseCesarCipher = false;
+	public GameObject m_pOtherPlayerCharacterPrefab;
     private float m_fTimeSinceLastResponse = 0.0f;  //This value must be reset when a response from the server is received.
     public float m_fMaxTimeSinceLastResponse = 15.0f;
     public bool m_bAutoReceiveMessages = true; //Deactivate this to stop this client from receiving its own messages.
@@ -65,7 +65,7 @@ public class CClient : MonoBehaviour
         try
         {
             m_fTimeSinceLastResponse = 0.0f;
-            Debug.Log("Beggining to receive: ");
+            Debug.Log("Beginning to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
             m_dtBeginDateTime = DateTime.UtcNow;
             SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
@@ -81,7 +81,7 @@ public class CClient : MonoBehaviour
     {
         //NOTE::: MAYBE IT COULD NOTIFY THE OTHERS BY ITSELF, WITH A SEND TO GROUP MESSAGE.
         //NOTE::: Remember that we use send so "Ensure" the transmision is made. That's why we don't call our standard SendUDP functions, as they use BeginSend.
-        Debug.LogWarning("Quitting application, notifying the Server, so he notifies everyone else. Notifing the server: " + m_szServerIP);
+        Debug.LogWarning("Quitting application, notifying the Server, so he notifies everyone else. Notifying the server: " + m_szServerIP);
         if (m_szServerIP != "0.0.0.0")
         {
             //SendUDPMessage('Y', "User_Quit", "Empty", m_szServerIP, 10000);
@@ -483,6 +483,12 @@ public class CClient : MonoBehaviour
         }
     }
 
+	public void SpawnClient(  )
+	{
+		//Ok, we need to know the position where to spawn it on the world.
+
+	}
+
     int SelectNewServer(  )
     {
         //Check the conditions to become the new server.
@@ -490,7 +496,7 @@ public class CClient : MonoBehaviour
         m_iServerID = GetLowestID(); //Note that the ServerIP is also set in the GetLowestID function.
         if (m_iServerID == m_iID)
         {
-            if (m_pServer != null) //need to check for null, so it doesnt add more than one.
+            if (m_pServer != null) //need to check for null, so it doesn't add more than one.
             {
                 Debug.LogError("ERROR, tried to start a server when there's already in this client's machine.");
                 return -1;//exit this function.
