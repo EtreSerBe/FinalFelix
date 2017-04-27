@@ -20,6 +20,8 @@ public class CClient : MonoBehaviour
     public float m_fHeartBeatMessageInterval = 2.5f;
     public string m_szPseudoBroadcastAddress = "223.0.0.0"; //some random value.
 
+	public long m_iCurrentFrame = 0;
+
     bool bDisconnected = false;//This value must be modified when a first response of the server/host is received.
     //bool m_bConnectionStablished = false;
     public int m_iID = 0; //ID value used to identify the clients from the Server's perspective.
@@ -487,6 +489,21 @@ public class CClient : MonoBehaviour
 	{
 		//Ok, we need to know the position where to spawn it on the world.
 
+	}
+
+
+	public long GetCurrentFrame( DateTime in_dtReferenceTime, long in_iReferenceFrame )
+	{
+
+		long fixedUpdateInverse = (long)(1.0f/Time.fixedDeltaTime);
+		long iCurrentFrame = (in_dtReferenceTime.Ticks - DateTime.UtcNow.Ticks ) / fixedUpdateInverse;
+		if ( iCurrentFrame != m_iCurrentFrame )
+		{
+			Debug.LogWarning("This client had a different frame that it should have. It was: " + m_iCurrentFrame + " and it should be: " + iCurrentFrame);
+			m_iCurrentFrame = iCurrentFrame;
+		}
+
+		return m_iCurrentFrame;
 	}
 
     int SelectNewServer(  )
