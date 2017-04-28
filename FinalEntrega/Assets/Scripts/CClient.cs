@@ -365,7 +365,7 @@ public class CClient : MonoBehaviour
                             ClientInfo tmpThisClientInfo = new ClientInfo( m_iID, m_szClientIP);
                             m_dicKnownClients.Add(m_szClientIP, tmpThisClientInfo);
 							m_dicClientsGameState.Add(m_szClientIP, new GameInstantState(Vector3.zero, Vector3.forward));
-							m_dicClientsAvatars.Add(m_szClientIP, Instantiate<GameObject>(m_pOtherPlayerCharacterPrefab));
+							m_dicClientsAvatars.Add(m_szClientIP, Instantiate<GameObject>(m_pOtherPlayerCharacterPrefab, transform.position, transform.rotation)); //it must not be a child to this game object.
 
 						}
                         Debug.Log("Exit Conn_Accepted case.");
@@ -385,7 +385,9 @@ public class CClient : MonoBehaviour
                             ClientInfo tmpNewClient = new ClientInfo( int.Parse(NewUserContent[0]) , NewUserContent[1]);
                             Debug.LogWarning("A New User has accessed the game, its ID is: " + tmpNewClient.m_iID.ToString() + " and its IP is: " + tmpNewClient.m_szIPAdress);
                             m_dicKnownClients.Add(tmpNewClient.m_szIPAdress, tmpNewClient); //we add it to the Dictionary of known clients.
-                            Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
+							m_dicClientsGameState.Add( tmpNewClient.m_szIPAdress, new GameInstantState( Vector3.zero, Vector3.forward ) );
+							m_dicClientsAvatars.Add( tmpNewClient.m_szIPAdress, Instantiate<GameObject>( m_pOtherPlayerCharacterPrefab, transform.position, transform.rotation ) ); //it must not be a child to this game object
+							Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
                         Debug.Log("Exit New_User case.");
                     }
@@ -411,7 +413,8 @@ public class CClient : MonoBehaviour
                             if (m_dicKnownClients.ContainsKey(szMessageContent[0]))
                             {
                                 Debug.LogWarning("Removing from Known clients the IP: " +  szMessageContent[0] + "because it is: " + szMessageContent[1]); //print the reason for the disconnection.
-                                m_dicKnownClients.Remove(szMessageContent[0]);
+                                RemoveClienFromDic (szMessageContent[0]);
+
                             }
                             else
                             {
@@ -440,8 +443,10 @@ public class CClient : MonoBehaviour
                             else
                             {
                                 m_dicKnownClients.Add(szMessageContent[1], new ClientInfo(int.Parse(szMessageContent[0]), szMessageContent[1])); // add the new info.
-                            }
-                            Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
+								m_dicClientsGameState.Add( szMessageContent[1] , new GameInstantState(Vector3.zero, Vector3.forward) );
+								m_dicClientsAvatars.Add( szMessageContent[1], Instantiate<GameObject>( m_pOtherPlayerCharacterPrefab, transform.position, transform.rotation ) ); //it must not be a child to this game object.
+							}
+							Debug.Log("This client now knows: " + m_dicKnownClients.Count + " Clients.");
                         }
                         Debug.Log("Exit Known_User case.");
                     }
@@ -453,7 +458,8 @@ public class CClient : MonoBehaviour
                         {
                             //Maybe show an IN-GAME notification about this would be good.
                             Debug.LogWarning("A user has Quit the application. Removing it from the known clients. Its IP was: " + pActualMessage.m_szTargetAddress);
-                            m_dicKnownClients.Remove(pActualMessage.m_szTargetAddress);
+                            RemoveClienFromDic (pActualMessage.m_szTargetAddress);
+							
                             //Also, we need to check if the one who disconnected was the Current leader. If so, It will cause an instant re-election.
                             if ( pActualMessage.m_szTargetAddress == m_szServerIP )
                             {
@@ -475,7 +481,8 @@ public class CClient : MonoBehaviour
                     {
                         Debug.LogWarning("Warning, entered Migrate case on the Client. This Node will begin connection to that new leader.");
                         //so, practically we reset this user to be a new one. It must clean its dicKnownUsers and stuff.
-                        m_dicKnownClients.Clear();
+                        
+						ClearClientsLists();
                         m_iID = 0; //Reset the ID.
                         m_szServerIP = "0.0.0.0";
                         m_szMulticastIP = "223.0.0.0";
@@ -496,15 +503,23 @@ public class CClient : MonoBehaviour
 							if ( !m_dicClientsGameState.ContainsKey( pActualMessage.m_szTargetAddress ) )
 							{
 								//Then, we add it to the list.
-								Debug.LogWarning( "An update message got to this user, but it doens't know it. Please be careful." );
+								Debug.LogWarning( "An update message got to this user, but it doesn't know it. Please be careful." );
 							}
 							else
 							{
 								GameInstantState tmpNewState = new GameInstantState( pActualMessage.m_szMessageContent );
 
-								m_dicClientsGameState[pActualMessage.m_szTargetAddress] = tmpNewState; //Just copy it. Then, update it.
+								if ( m_dicClientsGameState[pActualMessage.m_szTargetAddress].m_dtTimeGenerated < tmpNewState.m_dtTimeGenerated )
+								{
+									m_dicClientsGameState[pActualMessage.m_szTargetAddress] = tmpNewState; //Just copy it. Then, update it.
+									m_dicClientsAvatars[pActualMessage.m_szTargetAddress].transform.position = tmpNewState.m_vPosition;
+									m_dicClientsAvatars[pActualMessage.m_szTargetAddress].transform.eulerAngles = tmpNewState.m_vRotationEulerAngles;
+								}
+								else
+								{
+									Debug.LogWarning("An old Update message for some player was received, no problem here, just letting you know.");
+								}
 							}
-								
 						}
 						Debug.Log( "Exited User_Update case message of the Client." );
 					}
@@ -518,6 +533,32 @@ public class CClient : MonoBehaviour
             //In-game message, such as action performed.
         }
     }
+
+	private void ClearClientsLists( )
+	{
+		m_dicKnownClients.Clear();
+		m_dicClientsGameState.Clear();
+		Debug.LogWarning("Clearing the clients avatars from this client. This is a standard procedure.");
+		foreach ( KeyValuePair<string, GameObject> element in m_dicClientsAvatars)
+		{
+			Destroy(element.Value);
+		}
+	}
+
+	private void RemoveClienFromDic( string in_szKey )
+	{
+		if ( m_dicKnownClients.ContainsKey( in_szKey ) )
+		{
+			m_dicKnownClients.Remove( in_szKey );
+			m_dicClientsGameState.Remove( in_szKey );
+			Destroy( m_dicClientsAvatars[in_szKey] );
+			m_dicClientsAvatars.Remove( in_szKey );
+		}
+		else
+		{
+			Debug.LogWarning("Warning, tried to remove a client which is not known to this one.");
+		}
+	}
 
 	public void SpawnClient(  )
 	{
