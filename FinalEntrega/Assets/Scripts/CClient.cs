@@ -62,6 +62,9 @@ public class CClient : MonoBehaviour
             Debug.Log(m_szClientIP + " is this client's IP address");
         }
 
+		Debug.LogWarning(CGlobals.GetNistTime().ToString( "MM/dd/yyyy hh:mm:ss.fff" ) );
+		//CGlobals.GetNISTTime();
+
         //Client uses as receive udp client
         m_udpClient = new UdpClient( 10000);
         m_udpClient.EnableBroadcast = true;
@@ -73,7 +76,7 @@ public class CClient : MonoBehaviour
             m_fTimeSinceLastResponse = 0.0f;
             Debug.Log("Beginning to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
-            m_dtBeginDateTime = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ));
+            m_dtBeginDateTime = GetGlobalTime();
             SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
         }
         catch (Exception e)
@@ -81,6 +84,16 @@ public class CClient : MonoBehaviour
             Debug.Log("caught exception : " + e.ToString());
         }
     }
+
+	public DateTime GetGlobalTime( )
+	{
+		return DateTime.UtcNow.Add(CGlobals.m_tsDifferenceFromLocalToGlobalTime);
+	}
+
+	public string GetGlobalTimeString( )
+	{
+		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ;
+	}
 
     //Unity predefined event called when the application is Quit.
     private void OnApplicationQuit()
@@ -491,7 +504,7 @@ public class CClient : MonoBehaviour
                         m_MessagesList.Clear(); //Clear it from any possible messages // DANGEROUS, PLEASE CORROBORATE. 25 / April / 2017.
                         //Finally, we send the Begin Connection message to the specific address of the new Leader.
                         //NOTE::: SHOULD WE RESTART THE TIME OF CONNECTION OF EACH USER MIGRATING?
-                        m_dtBeginDateTime = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )); //We opted to YES, reset it.
+                        m_dtBeginDateTime = GetGlobalTime(); //We opted to YES, reset it.
                         SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
                     }
 					break;
@@ -576,7 +589,7 @@ public class CClient : MonoBehaviour
 	*/
 	public string GetUpdateContent( )
 	{
-		string tmpResult = ( CGlobals.Vec3ToString( transform.position) + '\t' + CGlobals.Vec3ToString(transform.localRotation.eulerAngles ) + '\t' + DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )).ToString("MM/dd/yyyy hh:mm:ss.fff") + '\t' + "Still");
+		string tmpResult = ( CGlobals.Vec3ToString( transform.position) + '\t' + CGlobals.Vec3ToString(transform.localRotation.eulerAngles ) + '\t' + GetGlobalTimeString() + '\t' + "Still");
 		return tmpResult;
 	}
 
@@ -584,7 +597,7 @@ public class CClient : MonoBehaviour
 	{
 
 		long fixedUpdateInverse = (long)(1.0f/Time.fixedDeltaTime);
-		long iCurrentFrame = (in_dtReferenceTime.Ticks - DateTime.UtcNow.Ticks ) / fixedUpdateInverse;
+		long iCurrentFrame = (in_dtReferenceTime.Ticks - GetGlobalTime().Ticks ) / fixedUpdateInverse;
 		if ( iCurrentFrame != m_iCurrentFrame )
 		{
 			Debug.LogWarning("This client had a different frame that it should have. It was: " + m_iCurrentFrame + " and it should be: " + iCurrentFrame);

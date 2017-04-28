@@ -98,8 +98,7 @@ public struct ClientTimers
 
     public ClientTimers( bool bTrue = true )
     {
-        m_dtTimeSinceLastMessage = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); ;
-        m_dtTimeSinceLastHeartBeat = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); ;
+        m_dtTimeSinceLastHeartBeat = m_dtTimeSinceLastMessage =CGlobals.GetGlobalTime() ;
     }
 
     public void SetTimeSinceLastMessage(DateTime in_Time)
@@ -122,11 +121,12 @@ public struct GameInstantState
     public Vector3 m_vPosition;
     public Vector3 m_vRotationEulerAngles;
 	//Maybe also store Speed?? or something like that?
-	public GameInstantState( Vector3 in_vPosition, Vector3 in_vEulerAngles, string in_szInputSate = "Still" )
+	public GameInstantState( Vector3 in_vPosition, Vector3 in_vEulerAngles, string in_szInputSate = "Still", bool in_bSetToZero = false )
 	{
 		m_vPosition = in_vPosition;
 		m_vRotationEulerAngles = in_vEulerAngles;
-		m_dtTimeGenerated = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); //The time this message is generated
+
+		m_dtTimeGenerated =  CGlobals.GetGlobalTime();//The time this message is generated
 		m_szInput = in_szInputSate; //Or the name of the default value.
 	}
 
@@ -139,7 +139,7 @@ public struct GameInstantState
 			Debug.LogError("ERROR, the format of the string to construct the GameInstantState was not correct, it was: " + in_szMessageContent);
 			m_vPosition = Vector3.zero;
 			m_vRotationEulerAngles = Vector3.forward;
-			m_dtTimeGenerated = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )); //The time this message is generated
+			m_dtTimeGenerated = CGlobals.GetGlobalTime(); //The time this message is generated
 			m_szInput = "Still"; //Or the name of the default value.
 		}
 		else
@@ -188,8 +188,18 @@ public class CServer : MonoBehaviour
         return iHighest;
     }
 
-    //This coroutine is used by the Server Machine to decide if a user has gone DISCONNECTED.
-    public IEnumerator CheckHeartBeatCoroutine(string in_szIPAddress)
+	public DateTime GetGlobalTime( )
+	{
+		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime );
+	}
+
+	public string GetGlobalTimeString( )
+	{
+		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff" );
+	}
+
+	//This coroutine is used by the Server Machine to decide if a user has gone DISCONNECTED.
+	public IEnumerator CheckHeartBeatCoroutine(string in_szIPAddress)
     {
         yield return new WaitForSeconds(m_fMaxTimeSinceLastHeartBeat);
         //Now, we do our checking.
@@ -199,7 +209,7 @@ public class CServer : MonoBehaviour
             Debug.LogWarning("Warning, checking the Timeout HeartBeat for a client which is not registered on the KnownClients Timers Dictionary.");
         }
 
-        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )));
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(GetGlobalTime());
         if ((TimeDiff.Seconds >= m_fMaxTimeSinceLastHeartBeat) //if more
             || TimeDiff.Minutes > 0) //if more than a minute has elapsed since last heartbeat, disconnect that user.
         {
@@ -235,7 +245,7 @@ public class CServer : MonoBehaviour
             Debug.LogWarning("Warning, checking the Timeout for a client which is not registered on the KnownClients Dictionary.");
         }
 
-        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )));
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(GetGlobalTime());
         if ((TimeDiff.Minutes == m_pClientRef.m_iMaxMinutesSinceLastResponse && TimeDiff.Seconds >= m_pClientRef.m_iMaxSecondsSinceLastResponse) //if more
             || TimeDiff.Minutes > m_pClientRef.m_iMaxMinutesSinceLastResponse)
         {
@@ -263,12 +273,12 @@ public class CServer : MonoBehaviour
     public void UpdateLastMessageFromAddress(string in_szAddress)
     {
         //NOTE::: CHECK THAT THE ADDRESS IS CORRECT, MAYBE WE HAVE TO RETRIEVE IT FROM THE DICTIONARY!"!!!!!
-        //Debug.Log("Server is resseting the INACTIVITY timeout for client with IP: " + in_szAddress);
-        //Stop the actual coroutine Timeoutn for this address, so we can start a new one.
+        //Debug.Log("Server is reseting the INACTIVITY timeout for client with IP: " + in_szAddress);
+        //Stop the actual coroutine Timeout for this address, so we can start a new one.
         StopCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
         if (m_dicClientTimers.ContainsKey(in_szAddress))
         {
-            m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage( DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) )); //A function was needed, as Dictionary can be a real Dick about it.
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(GetGlobalTime()); //A function was needed, as Dictionary can be a real Dick about it.
             //Then, we manage the times since this user last sent a message.
             StartCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
         }
@@ -283,7 +293,7 @@ public class CServer : MonoBehaviour
         StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         if (m_dicClientTimers.ContainsKey(in_szAddress))
         {
-            m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat( DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) )); //A function was needed, as Dictionary can be a real Dick about it.
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat( GetGlobalTime()); //A function was needed, as Dictionary can be a real Dick about it.
             //Then, we manage the times since this user last sent a message.
             StartCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         }
