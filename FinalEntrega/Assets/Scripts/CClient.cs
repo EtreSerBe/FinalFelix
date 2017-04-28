@@ -73,8 +73,8 @@ public class CClient : MonoBehaviour
             m_fTimeSinceLastResponse = 0.0f;
             Debug.Log("Beginning to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
-            m_dtBeginDateTime = DateTime.UtcNow;
-            SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+            m_dtBeginDateTime = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ));
+            SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
         }
         catch (Exception e)
         {
@@ -129,7 +129,7 @@ public class CClient : MonoBehaviour
     //Used to be called N seconds after a BackOff has been decided.
     public void BackOffInvoke()
     {
-        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
         m_fTimeSinceLastResponse = 0.0f; //Restart the timer for the last response. It was disabled to avoid disasters. 9:55pm 22/04
     }
 
@@ -148,7 +148,7 @@ public class CClient : MonoBehaviour
         
         
         Message pReceivedMessage = new Message(received); //Construct the message with the special constructor which receives an array of bytes.
-		Debug.Log( "The received data was: " + pReceivedMessage.ToString() );//Now it has to be like this, in case it comes encrypted.
+		//Debug.Log( "The received data was: " + pReceivedMessage.ToString() );//Now it has to be like this, in case it comes encrypted.
 		//Debug.Log("the Destination Address value received was: " + pReceivedMessage.m_szDestinationAddress);
 		if (pReceivedMessage.m_szDestinationAddress == IPAddress.Broadcast.ToString())
         {
@@ -167,19 +167,19 @@ public class CClient : MonoBehaviour
             {
                 //NOTICE: The thing with the comparisons is the NANOSECONDS, which can cause a slight difference between two dates.
                 DateTime tmpReceivedDate = DateTime.Parse(pReceivedMessage.m_szMessageContent);//UTC format is mandatory to do the comparison
-                Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString() + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString() );
+                Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) );
                 //Debug.LogWarning((tmpReceivedDate < m_dtBeginDateTime) + " y está en UTC?" + tmpReceivedDate.Kind.ToString()); //It is MANDATORY that they are both in the UTC format.
-                //Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks < m_dtBeginDateTime.Ticks));
+                Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks - m_dtBeginDateTime.Ticks).ToString());
                 long tmpLTimeDiff = (m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks);
                 //If the BeginTime is at least 10,000,000 nanoseconds greater, then it must wait for the other client to become server.
-                if (tmpLTimeDiff > 10000000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
+                if (tmpLTimeDiff > 1000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
                 {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
                     //Not necessarily the one received will become the new server, so we do not make any rushed assumptions, like to record its IP address as server or anything like that.
                     Debug.LogWarning("NOTICE: There's another client trying to become server or looking for one. He got active first, so this client will WAIT for it.");
                     Message pAutoMessage = new Message('N', m_iID.ToString(), m_szClientIP, "Back_Off", m_szClientIP, "Empty");//this message won't be send, it's automatically enqueued to be processed by this very same client.
                     m_MessagesList.Add(pAutoMessage); //A PATCH TO SEE IF IT WORKS CORRECTLY
                 }
-                else if( tmpLTimeDiff < -10000000 )
+                else if( tmpLTimeDiff < -1000 )
                 {
                     Debug.LogWarning("Sending Back_Off message to the address: " + pReceivedMessage.m_szTargetAddress);
                     //Send a message to the other client, letting it know that this client came first, so it has priority.
@@ -207,7 +207,7 @@ public class CClient : MonoBehaviour
             }
             else
             {
-                Debug.Log("The specific message was for the client, adding it to its message list.");
+                //Debug.Log("The specific message was for the client, adding it to its message list.");
                 m_MessagesList.Add(pReceivedMessage);
             }
         }
@@ -216,7 +216,7 @@ public class CClient : MonoBehaviour
             //Also, reset the time since the last message was received.
             m_fTimeSinceLastResponse = 0.0f; //NOTE:::: Check if it has to be here...
             //Then, it was sent to the multicast group.
-            Debug.Log("MULTICAST message received, adding it to its message list.");
+            //Debug.Log("MULTICAST message received, adding it to its message list.");
             m_MessagesList.Add(pReceivedMessage);
             //This is where we start the check for inactivity of the users, inside the Coroutine.
             if (m_pServer != null) //check if this Node is the same one as the server, if it is, then it must check the timeouts.
@@ -249,7 +249,7 @@ public class CClient : MonoBehaviour
 		{
 			msgBytes = CGlobals.CesarCipher(msgBytes);
 		}
-        Debug.Log("Sending a message to Endpoint: " + in_szAddress + " and port: " + in_iPort + " from IP: " + m_szClientIP );
+        //Debug.Log("Sending a message to Endpoint: " + in_szAddress + " and port: " + in_iPort + " from IP: " + m_szClientIP );
         //Send a message to the server.
         
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(in_szAddress), in_iPort);
@@ -273,7 +273,7 @@ public class CClient : MonoBehaviour
 		{
 			msgBytes = CGlobals.CesarCipher( msgBytes );
 		}
-		Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort + " from IP: " + m_szClientIP);
+		//Debug.Log("Sending a message to Multicast group address: " + m_szMulticastIP.ToString() + " and port: " + m_iMulticastPort + " from IP: " + m_szClientIP);
         //Send a message to the server.
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse( m_szMulticastIP), m_iMulticastPort);
         m_udpClient.BeginSend(msgBytes, msgBytes.Length, RemoteIpEndPoint, sendCallback, null);//Do the multicast.
@@ -491,8 +491,8 @@ public class CClient : MonoBehaviour
                         m_MessagesList.Clear(); //Clear it from any possible messages // DANGEROUS, PLEASE CORROBORATE. 25 / April / 2017.
                         //Finally, we send the Begin Connection message to the specific address of the new Leader.
                         //NOTE::: SHOULD WE RESTART THE TIME OF CONNECTION OF EACH USER MIGRATING?
-                        m_dtBeginDateTime = DateTime.UtcNow; //We opted to YES, reset it.
-                        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
+                        m_dtBeginDateTime = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )); //We opted to YES, reset it.
+                        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
                     }
 					break;
 				case "User_Update":
@@ -508,16 +508,17 @@ public class CClient : MonoBehaviour
 							else
 							{
 								GameInstantState tmpNewState = new GameInstantState( pActualMessage.m_szMessageContent );
-
-								if ( m_dicClientsGameState[pActualMessage.m_szTargetAddress].m_dtTimeGenerated < tmpNewState.m_dtTimeGenerated )
+								long TempDiff = m_dicClientsGameState[pActualMessage.m_szTargetAddress].m_dtTimeGenerated.Ticks - tmpNewState.m_dtTimeGenerated.Ticks;
+								if ( TempDiff < -1000 )
 								{
+									//The, the one received is a newer one
 									m_dicClientsGameState[pActualMessage.m_szTargetAddress] = tmpNewState; //Just copy it. Then, update it.
 									m_dicClientsAvatars[pActualMessage.m_szTargetAddress].transform.position = tmpNewState.m_vPosition;
 									m_dicClientsAvatars[pActualMessage.m_szTargetAddress].transform.eulerAngles = tmpNewState.m_vRotationEulerAngles;
 								}
-								else
+								else if ( TempDiff > 1000 )
 								{
-									Debug.LogWarning("An old Update message for some player was received, no problem here, just letting you know.");
+									Debug.LogWarning("An old Update message for some player was received, no problem here, just letting you know. " + m_dicClientsGameState[pActualMessage.m_szTargetAddress].m_dtTimeGenerated.Ticks + " the received one was "  + tmpNewState.m_dtTimeGenerated.Ticks );
 								}
 							}
 						}
@@ -575,7 +576,7 @@ public class CClient : MonoBehaviour
 	*/
 	public string GetUpdateContent( )
 	{
-		string tmpResult = ( CGlobals.Vec3ToString( transform.position) + '\t' + CGlobals.Vec3ToString(transform.localRotation.eulerAngles ) + '\t' + DateTime.UtcNow.ToString() + '\t' + "Still");
+		string tmpResult = ( CGlobals.Vec3ToString( transform.position) + '\t' + CGlobals.Vec3ToString(transform.localRotation.eulerAngles ) + '\t' + DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )).ToString("MM/dd/yyyy hh:mm:ss.fff") + '\t' + "Still");
 		return tmpResult;
 	}
 
@@ -614,7 +615,7 @@ public class CClient : MonoBehaviour
             //This parameter is used to be able to use the same function for two very similar things., for first time and for instant re-election.
             if(m_dicKnownClients.ContainsKey(m_szClientIP) == false)
             {
-                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
             }
             //bDisconnected = false; //JUST FOR TESTING.
         }

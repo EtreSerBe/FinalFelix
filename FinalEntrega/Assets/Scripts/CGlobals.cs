@@ -14,24 +14,24 @@ public class CGlobals : MonoBehaviour
 	public static byte[] CesarCipher( byte[] in_byteArray )
 	{
 		byte tmp = 10;
-		Debug.Log( "The NON-encrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
+		//Debug.Log( "The NON-encrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
 		for ( int i = 0; i < in_byteArray.Length; i++ )
 		{
 			in_byteArray[i] = (byte)( in_byteArray[i] + tmp );
 		}
-		Debug.Log( "The encrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
+		//Debug.Log( "The encrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
 		return in_byteArray;
 	}
 
 	public static byte[] CesarCipherDecrypt( byte[] in_byteArray )
 	{
 		byte tmp = 10;
-		Debug.Log( "The encrypted data to Decrypt is: " + Encoding.UTF8.GetString( in_byteArray ) );
+		//Debug.Log( "The encrypted data to Decrypt is: " + Encoding.UTF8.GetString( in_byteArray ) );
 		for ( int i = 0; i < in_byteArray.Length; i++ )
 		{
 			in_byteArray[i] = (byte)( in_byteArray[i] - tmp );
 		}
-		Debug.Log( "The Decrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
+		//Debug.Log( "The Decrypted data is: " + Encoding.UTF8.GetString( in_byteArray ) );
 		return in_byteArray;
 	}
 

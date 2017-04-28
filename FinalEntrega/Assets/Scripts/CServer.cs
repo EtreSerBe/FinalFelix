@@ -98,8 +98,8 @@ public struct ClientTimers
 
     public ClientTimers( bool bTrue = true )
     {
-        m_dtTimeSinceLastMessage = DateTime.Now;
-        m_dtTimeSinceLastHeartBeat = DateTime.Now;
+        m_dtTimeSinceLastMessage = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); ;
+        m_dtTimeSinceLastHeartBeat = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); ;
     }
 
     public void SetTimeSinceLastMessage(DateTime in_Time)
@@ -126,7 +126,7 @@ public struct GameInstantState
 	{
 		m_vPosition = in_vPosition;
 		m_vRotationEulerAngles = in_vEulerAngles;
-		m_dtTimeGenerated = DateTime.UtcNow; //The time this message is generated
+		m_dtTimeGenerated = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ); //The time this message is generated
 		m_szInput = in_szInputSate; //Or the name of the default value.
 	}
 
@@ -139,7 +139,7 @@ public struct GameInstantState
 			Debug.LogError("ERROR, the format of the string to construct the GameInstantState was not correct, it was: " + in_szMessageContent);
 			m_vPosition = Vector3.zero;
 			m_vRotationEulerAngles = Vector3.forward;
-			m_dtTimeGenerated = DateTime.UtcNow; //The time this message is generated
+			m_dtTimeGenerated = DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )); //The time this message is generated
 			m_szInput = "Still"; //Or the name of the default value.
 		}
 		else
@@ -199,7 +199,7 @@ public class CServer : MonoBehaviour
             Debug.LogWarning("Warning, checking the Timeout HeartBeat for a client which is not registered on the KnownClients Timers Dictionary.");
         }
 
-        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )));
         if ((TimeDiff.Seconds >= m_fMaxTimeSinceLastHeartBeat) //if more
             || TimeDiff.Minutes > 0) //if more than a minute has elapsed since last heartbeat, disconnect that user.
         {
@@ -235,7 +235,7 @@ public class CServer : MonoBehaviour
             Debug.LogWarning("Warning, checking the Timeout for a client which is not registered on the KnownClients Dictionary.");
         }
 
-        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(System.DateTime.Now);
+        System.TimeSpan TimeDiff = OutClientInfo.m_dtTimeSinceLastMessage.Subtract(DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" )));
         if ((TimeDiff.Minutes == m_pClientRef.m_iMaxMinutesSinceLastResponse && TimeDiff.Seconds >= m_pClientRef.m_iMaxSecondsSinceLastResponse) //if more
             || TimeDiff.Minutes > m_pClientRef.m_iMaxMinutesSinceLastResponse)
         {
@@ -268,7 +268,7 @@ public class CServer : MonoBehaviour
         StopCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
         if (m_dicClientTimers.ContainsKey(in_szAddress))
         {
-            m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastMessage( DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) )); //A function was needed, as Dictionary can be a real Dick about it.
             //Then, we manage the times since this user last sent a message.
             StartCoroutine(CheckTimeSinceLastMessageCoroutine(in_szAddress));
         }
@@ -283,7 +283,7 @@ public class CServer : MonoBehaviour
         StopCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         if (m_dicClientTimers.ContainsKey(in_szAddress))
         {
-            m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat(DateTime.Now); //A function was needed, as Dictionary can be a real Dick about it.
+            m_dicClientTimers[in_szAddress].SetTimeSinceLastHeartBeat( DateTime.Parse( DateTime.UtcNow.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) )); //A function was needed, as Dictionary can be a real Dick about it.
             //Then, we manage the times since this user last sent a message.
             StartCoroutine(CheckHeartBeatCoroutine(in_szAddress));
         }
@@ -293,7 +293,7 @@ public class CServer : MonoBehaviour
     public void CheckForDoubleLeader()
     {
         Debug.LogWarning("Checking for possible multiple leaders. This is a standard procedure to prevent undesired behaviours.");
-        m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString(), IPAddress.Broadcast.ToString(), 10000);
+        m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
     }
 
     //Starts this component as the active server.
@@ -450,7 +450,7 @@ public class CServer : MonoBehaviour
                         Debug.LogWarning("Entered Current_Leader case on the Leader.");
                         DateTime ReceivedStartTime = DateTime.Parse(pActualMessage.m_szMessageContent);
                         long iTmpTimeDiff = m_pClientRef.m_dtBeginDateTime.Ticks - ReceivedStartTime.Ticks;
-                        if (iTmpTimeDiff > 10000000)//NOTE: this 10,000,000 value is because the DateTime loses some granularity when transformed to string.
+                        if (iTmpTimeDiff > 1000)//NOTE: this 10,000,000 value is because the DateTime loses some granularity when transformed to string.
                         {
                             //Then, this one is the leader that started later, so the other one has priority. All the users in this "subnet" must migrate to the other one.
                             m_pClientRef.SendUDPMessageToGroup('N', "Migrate", pActualMessage.m_szTargetAddress); //Please be aware that this Node will also receive that message, so the CServer component must be removed.
@@ -459,7 +459,7 @@ public class CServer : MonoBehaviour
                             Destroy(this);//Removes this script from the gameObject.
                             //NOTHING FROM THIS POINT ON WILL LONGER BE EXECUTED! THIS COMPONENT IS DESTROYED. DO NOT PUT CODE HERE.
                         }
-                        else if ( iTmpTimeDiff < -10000000 )
+                        else if ( iTmpTimeDiff < -1000 )
                         {
                             //Then, this leader started earlier than the other. It will notify the other, so we just use the Current_Leader message we used before, but directed to an specific node.
                             m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_szClientIP, pActualMessage.m_szTargetAddress, 10000);
