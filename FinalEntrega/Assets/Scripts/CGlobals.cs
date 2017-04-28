@@ -55,8 +55,11 @@ public class CGlobals : MonoBehaviour
 		var myHttpWebRequest = (HttpWebRequest)WebRequest.Create("http://www.google.com");
 		var response = myHttpWebRequest.GetResponse();
 		string todaysDates = response.Headers["date"];
-		m_dtGlobalTime = DateTime.Parse(todaysDates).AddMilliseconds(DateTime.UtcNow.Millisecond);
-		m_tsDifferenceFromLocalToGlobalTime = m_dtGlobalTime.Subtract(DateTime.UtcNow);
+		m_dtGlobalTime = DateTime.Parse( todaysDates );//.AddMilliseconds(DateTime.UtcNow.Millisecond);
+		m_dtGlobalTime = DateTime.SpecifyKind( m_dtGlobalTime, DateTimeKind.Local );
+		m_tsDifferenceFromLocalToGlobalTime = m_dtGlobalTime.Subtract(DateTime.Now);
+		Debug.LogWarning("The global date is: " + m_dtGlobalTime.ToString() + "  and the LOCAL one is: " + DateTime.Now.ToString());
+		Debug.LogWarning("The difference between this machines Now and the one from Internet is: " + m_tsDifferenceFromLocalToGlobalTime.ToString());
 		return m_dtGlobalTime;
 		//return DateTime.ParseExact( todaysDates,
 		//						   "ddd, dd MMM yyyy HH:mm:ss.fff 'GMT'",
@@ -66,12 +69,12 @@ public class CGlobals : MonoBehaviour
 
 	public static DateTime GetGlobalTime( )
 	{
-		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime );
+		return DateTime.Now.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime );
 	}
 
 	public static string GetGlobalTimeString( )
 	{
-		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff" );
+		return DateTime.Now.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff tt" );
 	}
 
 

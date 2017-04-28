@@ -62,7 +62,7 @@ public class CClient : MonoBehaviour
             Debug.Log(m_szClientIP + " is this client's IP address");
         }
 
-		Debug.LogWarning(CGlobals.GetNistTime().ToString( "MM/dd/yyyy hh:mm:ss.fff" ) );
+		Debug.LogWarning(CGlobals.GetNistTime().ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ) );
 		//CGlobals.GetNISTTime();
 
         //Client uses as receive udp client
@@ -77,7 +77,7 @@ public class CClient : MonoBehaviour
             Debug.Log("Beginning to receive: ");
             m_udpClient.BeginReceive(new AsyncCallback(recv), null);
             m_dtBeginDateTime = GetGlobalTime();
-            SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
+            SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ), IPAddress.Broadcast.ToString(), 10000);
         }
         catch (Exception e)
         {
@@ -87,12 +87,12 @@ public class CClient : MonoBehaviour
 
 	public DateTime GetGlobalTime( )
 	{
-		return DateTime.UtcNow.Add(CGlobals.m_tsDifferenceFromLocalToGlobalTime);
+		return DateTime.Now.Add(CGlobals.m_tsDifferenceFromLocalToGlobalTime);
 	}
 
 	public string GetGlobalTimeString( )
 	{
-		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff" ) ;
+		return DateTime.Now.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ) ;
 	}
 
     //Unity predefined event called when the application is Quit.
@@ -142,7 +142,7 @@ public class CClient : MonoBehaviour
     //Used to be called N seconds after a BackOff has been decided.
     public void BackOffInvoke()
     {
-        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
+        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ), IPAddress.Broadcast.ToString(), 10000);
         m_fTimeSinceLastResponse = 0.0f; //Restart the timer for the last response. It was disabled to avoid disasters. 9:55pm 22/04
     }
 
@@ -180,10 +180,14 @@ public class CClient : MonoBehaviour
             {
                 //NOTICE: The thing with the comparisons is the NANOSECONDS, which can cause a slight difference between two dates.
                 DateTime tmpReceivedDate = DateTime.Parse(pReceivedMessage.m_szMessageContent);//UTC format is mandatory to do the comparison
-                Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString( "MM/dd/yyyy hh:mm:ss.fff" ) );
-                //Debug.LogWarning((tmpReceivedDate < m_dtBeginDateTime) + " y está en UTC?" + tmpReceivedDate.Kind.ToString()); //It is MANDATORY that they are both in the UTC format.
+				tmpReceivedDate = DateTime.SpecifyKind(tmpReceivedDate, DateTimeKind.Local);
+				Debug.LogWarning( "This clients begin date was: " + m_dtBeginDateTime.ToString(  ) + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString( ) );
+
+				Debug.LogWarning("This clients begin date was: " + m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ) + " and the one received from the Broadcast was: " + tmpReceivedDate.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ) );
+                Debug.LogWarning((tmpReceivedDate < m_dtBeginDateTime) + " y está en UTC?" + tmpReceivedDate.Kind.ToString() + " ad the begin date is in format: " + m_dtBeginDateTime.Kind.ToString()); //It is MANDATORY that they are both in the UTC format.
                 Debug.LogWarning("The start date has format: " + m_dtBeginDateTime.Ticks.ToString() + " and the other one is: " + tmpReceivedDate.Ticks.ToString() + " and the comparison result is: " + (tmpReceivedDate.Ticks - m_dtBeginDateTime.Ticks).ToString());
-                long tmpLTimeDiff = (m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks);
+				Debug.LogWarning( m_dtBeginDateTime .Subtract(tmpReceivedDate).ToString());
+				long tmpLTimeDiff = (m_dtBeginDateTime.Ticks - tmpReceivedDate.Ticks);
                 //If the BeginTime is at least 10,000,000 nanoseconds greater, then it must wait for the other client to become server.
                 if (tmpLTimeDiff > 1000) // Negative means tmpReceivedDate is prior to m_dtBeginDateTime.
                 {  //WE GIVE THE 10,000,000 VALUE AS TOLERANCE FROM ITS OWN TIME, AS THE STRING IS NOT AS PRECISE AS THE DATETIME PER SE.
@@ -505,7 +509,7 @@ public class CClient : MonoBehaviour
                         //Finally, we send the Begin Connection message to the specific address of the new Leader.
                         //NOTE::: SHOULD WE RESTART THE TIME OF CONNECTION OF EACH USER MIGRATING?
                         m_dtBeginDateTime = GetGlobalTime(); //We opted to YES, reset it.
-                        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
+                        SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
                     }
 					break;
 				case "User_Update":
@@ -628,7 +632,7 @@ public class CClient : MonoBehaviour
             //This parameter is used to be able to use the same function for two very similar things., for first time and for instant re-election.
             if(m_dicKnownClients.ContainsKey(m_szClientIP) == false)
             {
-                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
+                SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ), IPAddress.Broadcast.ToString(), 10000);
             }
             //bDisconnected = false; //JUST FOR TESTING.
         }

@@ -190,12 +190,12 @@ public class CServer : MonoBehaviour
 
 	public DateTime GetGlobalTime( )
 	{
-		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime );
+		return DateTime.Now.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime );
 	}
 
 	public string GetGlobalTimeString( )
 	{
-		return DateTime.UtcNow.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff" );
+		return DateTime.Now.Add( CGlobals.m_tsDifferenceFromLocalToGlobalTime ).ToString( "MM/dd/yyyy hh:mm:ss.fff tt" );
 	}
 
 	//This coroutine is used by the Server Machine to decide if a user has gone DISCONNECTED.
@@ -303,7 +303,7 @@ public class CServer : MonoBehaviour
     public void CheckForDoubleLeader()
     {
         //Debug.LogWarning("Checking for possible multiple leaders. This is a standard procedure to prevent undesired behaviours.");
-        m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
+        m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff tt" ), IPAddress.Broadcast.ToString(), 10000);
     }
 
     //Starts this component as the active server.
