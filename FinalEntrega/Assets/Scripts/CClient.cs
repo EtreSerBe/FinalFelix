@@ -329,7 +329,7 @@ public class CClient : MonoBehaviour
         {
             Message pActualMessage = m_MessagesList[0]; //Get the first element of the container.
             m_MessagesList.RemoveAt(0); //Then, remove it from the container.
-            Debug.Log("Processing message with info: " + pActualMessage.ToString());
+            //Debug.Log("Processing message with info: " + pActualMessage.ToString());
 
             if (pActualMessage.m_szDestinationAddress == m_szMulticastIP && m_pServer != null)
             {
@@ -497,7 +497,7 @@ public class CClient : MonoBehaviour
 					break;
 				case "User_Update":
 					{
-						Debug.Log("Entered User_Update case message of the Client.");
+						//Debug.Log("Entered User_Update case message of the Client.");
 						if(m_dicKnownClients.ContainsKey( pActualMessage.m_szTargetAddress) )
 						{
 							if ( !m_dicClientsGameState.ContainsKey( pActualMessage.m_szTargetAddress ) )
@@ -522,7 +522,7 @@ public class CClient : MonoBehaviour
 								}
 							}
 						}
-						Debug.Log( "Exited User_Update case message of the Client." );
+						//Debug.Log( "Exited User_Update case message of the Client." );
 					}
 					break;
 

@@ -292,7 +292,7 @@ public class CServer : MonoBehaviour
 
     public void CheckForDoubleLeader()
     {
-        Debug.LogWarning("Checking for possible multiple leaders. This is a standard procedure to prevent undesired behaviours.");
+        //Debug.LogWarning("Checking for possible multiple leaders. This is a standard procedure to prevent undesired behaviours.");
         m_pClientRef.SendUDPMessage('Y', "Current_Leader", m_pClientRef.m_dtBeginDateTime.ToString( "MM/dd/yyyy hh:mm:ss.fff" ), IPAddress.Broadcast.ToString(), 10000);
     }
 
@@ -447,7 +447,7 @@ public class CServer : MonoBehaviour
                     break;
                 case "Current_Leader":
                     {
-                        Debug.LogWarning("Entered Current_Leader case on the Leader.");
+                        //Debug.LogWarning("Entered Current_Leader case on the Leader.");
                         DateTime ReceivedStartTime = DateTime.Parse(pActualMessage.m_szMessageContent);
                         long iTmpTimeDiff = m_pClientRef.m_dtBeginDateTime.Ticks - ReceivedStartTime.Ticks;
                         if (iTmpTimeDiff > 1000)//NOTE: this 10,000,000 value is because the DateTime loses some granularity when transformed to string.
@@ -468,9 +468,9 @@ public class CServer : MonoBehaviour
                         else if ( pActualMessage.m_szTargetAddress == m_pClientRef.m_szClientIP && pActualMessage.m_szSenderID == m_pClientRef.m_iID.ToString() ) // We just check this in case of really weird coincidences.
                         {
                             //Even with both those fields, it can be a coincidence. So the time must be checked.
-                            Debug.LogWarning("The Current_Leader message result was that: They are both the same Node.");
+                            //Debug.LogWarning("The Current_Leader message result was that: They are both the same Node.");
                         }
-                        Debug.LogWarning("Exit the Current_Leader case on the Leader.");
+                        //Debug.LogWarning("Exit the Current_Leader case on the Leader.");
                     }
                     break;
                 default:
