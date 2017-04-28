@@ -33,7 +33,11 @@ public class CClient : MonoBehaviour
     List<Message> m_MessagesList = new List<Message>();
     //HashSet<ClientInfo> m_setKnownClients = new HashSet<ClientInfo>();
     Dictionary<string, ClientInfo> m_dicKnownClients = new Dictionary<string, ClientInfo>();
-    public DateTime m_dtBeginDateTime ;
+	Dictionary<string, GameInstantState> m_dicClientsGameState = new Dictionary<string, GameInstantState>();
+	Dictionary<string, GameObject> m_dicClientsAvatars = new Dictionary<string, GameObject>();
+
+
+	public DateTime m_dtBeginDateTime ;
     //Dictionary<string, int> m_dicPreServerKnownClients = new Dictionary<string, int>();
 
     public CServer m_pServer = null; //null by default, only has a valid value when this client's machine is also executing the server.
@@ -282,11 +286,11 @@ public class CClient : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    private void FixedUpdate()
     {
         //Check if a new message has arrived.
         //If it has, process it.
-        m_fTimeSinceLastResponse += Time.deltaTime;
+        m_fTimeSinceLastResponse += Time.fixedDeltaTime;
 
         if (m_fTimeSinceLastResponse >= m_fMaxTimeSinceLastResponse && bDisconnected == false && m_MessagesList.Count == 0 )//Check if it has no more messages to be processed.
         {
@@ -302,11 +306,16 @@ public class CClient : MonoBehaviour
         else
         {
             ProcessMessage();
+			//Then, after the messages have been processed, send the gameUpdate message to the multicast group.
+			SendUDPMessageToGroup( 'N', "User_Update", GetUpdateContent() );
+
         }
     }
 
-    //
-    void ProcessMessage()
+
+
+	//
+	void ProcessMessage()
     {
         /*if (m_MessagesList.Count != 0)
         {
@@ -355,7 +364,10 @@ public class CClient : MonoBehaviour
                             m_udpClient.JoinMulticastGroup(IPAddress.Parse(m_szMulticastIP)); //NOTE:: CHECK THAT THE PORT IS NOT NECESSARY?
                             ClientInfo tmpThisClientInfo = new ClientInfo( m_iID, m_szClientIP);
                             m_dicKnownClients.Add(m_szClientIP, tmpThisClientInfo);
-                        }
+							m_dicClientsGameState.Add(m_szClientIP, new GameInstantState(Vector3.zero, Vector3.forward));
+							m_dicClientsAvatars.Add(m_szClientIP, Instantiate<GameObject>(m_pOtherPlayerCharacterPrefab));
+
+						}
                         Debug.Log("Exit Conn_Accepted case.");
                     }
                     break;
@@ -475,9 +487,31 @@ public class CClient : MonoBehaviour
                         m_dtBeginDateTime = DateTime.UtcNow; //We opted to YES, reset it.
                         SendUDPMessage('Y', "Begin_Con", m_dtBeginDateTime.ToString(), pActualMessage.m_szTargetAddress, 10000);//Send it Piggybacking the time of start.
                     }
-                    break;
+					break;
+				case "User_Update":
+					{
+						Debug.Log("Entered User_Update case message of the Client.");
+						if(m_dicKnownClients.ContainsKey( pActualMessage.m_szTargetAddress) )
+						{
+							if ( !m_dicClientsGameState.ContainsKey( pActualMessage.m_szTargetAddress ) )
+							{
+								//Then, we add it to the list.
+								Debug.LogWarning( "An update message got to this user, but it doens't know it. Please be careful." );
+							}
+							else
+							{
+								GameInstantState tmpNewState = new GameInstantState( pActualMessage.m_szMessageContent );
 
-            }
+								m_dicClientsGameState[pActualMessage.m_szTargetAddress] = tmpNewState; //Just copy it. Then, update it.
+							}
+								
+						}
+						Debug.Log( "Exited User_Update case message of the Client." );
+					}
+					break;
+
+
+			}
 
             //Begin connection message.
 
@@ -491,6 +525,18 @@ public class CClient : MonoBehaviour
 
 	}
 
+	//Returns the values in a string format, to be placed in a Message's Content field, in the following order: 
+	/*
+		1. Vector3 of position of this gameObject.
+		2. Vector3 of eulerAngles of this gameObject's rotation.
+		3. DateTime of the UtcNow when the message is being sent.
+		4. State of the input. In this case, it is the state of the player such as "Up_Down" or "Left_Right".
+	*/
+	public string GetUpdateContent( )
+	{
+		string tmpResult = ( CGlobals.Vec3ToString( transform.position) + '\t' + CGlobals.Vec3ToString(transform.localRotation.eulerAngles ) + '\t' + DateTime.UtcNow.ToString() + '\t' + "Still");
+		return tmpResult;
+	}
 
 	public long GetCurrentFrame( DateTime in_dtReferenceTime, long in_iReferenceFrame )
 	{

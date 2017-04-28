@@ -116,12 +116,46 @@ public struct GameInstantState
 {
     //Used to represent the "number" of message, in the exchange of messages. 
     //NOTE: the server must hold record of the latest message it has received from each client, so it can discard older messages?.
-    public int m_iMessageIndex;
+    public DateTime m_dtTimeGenerated;
     // I have my doubts about this one. Maybe it should be an array of values which can be used as input. (I.E: The whole keyboard state if needed).
     public string m_szInput; //Might be like the Gyroscope event generated.
     public Vector3 m_vPosition;
     public Vector3 m_vRotationEulerAngles;
-    //Maybe also store Speed?? or something like that?
+	//Maybe also store Speed?? or something like that?
+	public GameInstantState( Vector3 in_vPosition, Vector3 in_vEulerAngles, string in_szInputSate = "Still" )
+	{
+		m_vPosition = in_vPosition;
+		m_vRotationEulerAngles = in_vEulerAngles;
+		m_dtTimeGenerated = DateTime.UtcNow; //The time this message is generated
+		m_szInput = in_szInputSate; //Or the name of the default value.
+	}
+
+	public GameInstantState( string in_szMessageContent )
+	{
+		//3 of the first vec3, 3 of the second one, and 1 for Input and 1 for DateTime
+		string [] tmpValue = in_szMessageContent.Split("\t".ToCharArray(), 3+3+2); //4, as described in User_Update type of message.
+		if ( tmpValue.Length != (3 + 3 + 2) )
+		{
+			Debug.LogError("ERROR, the format of the string to construct the GameInstantState was not correct, it was: " + in_szMessageContent);
+			m_vPosition = Vector3.zero;
+			m_vRotationEulerAngles = Vector3.forward;
+			m_dtTimeGenerated = DateTime.UtcNow; //The time this message is generated
+			m_szInput = "Still"; //Or the name of the default value.
+		}
+		else
+		{
+			m_vPosition.x = float.Parse( tmpValue[0]);
+			m_vPosition.y = float.Parse( tmpValue[1] );
+			m_vPosition.z = float.Parse( tmpValue[2] );
+			m_vRotationEulerAngles.x = float.Parse( tmpValue[3] );
+			m_vRotationEulerAngles.y = float.Parse( tmpValue[4] );
+			m_vRotationEulerAngles.z = float.Parse( tmpValue[5] );
+			m_dtTimeGenerated = DateTime.Parse( tmpValue[6] ) ; //The time this message is generated
+			m_szInput = tmpValue[7]; //Or the name of the default value.
+		}
+	}
+
+
 };
 
 public class CServer : MonoBehaviour

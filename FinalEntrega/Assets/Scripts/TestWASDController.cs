@@ -5,6 +5,7 @@ using UnityEngine;
 public class TestWASDController : MonoBehaviour {
 
     public bool m_bDebug = true;
+	
 
 	// Use this for initialization
 	void Start () {

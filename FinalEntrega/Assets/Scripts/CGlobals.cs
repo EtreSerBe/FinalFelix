@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Text;
 
+
+
 public class CGlobals : MonoBehaviour
 {
 	public const int m_iHostListenPort = 10000;
@@ -33,4 +35,16 @@ public class CGlobals : MonoBehaviour
 		return in_byteArray;
 	}
 
+
+	public static string Vec3ToString( Vector3 in_vToParse )
+	{
+		string szValues = in_vToParse.x.ToString() + '\t' + in_vToParse.y.ToString() + '\t' + in_vToParse.z.ToString();
+		return szValues;
+	}
+
+	//public static Vector3 ParseToVec3( string in_szToParse )
+	//{
+
+	//	return Vector3.zero;
+	//}
 }
